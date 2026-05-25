@@ -1,0 +1,90 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #050a12;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.18), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(201, 162, 39, 0.08), transparent),
+    linear-gradient(180deg, #050a12 0%, #0a1018 50%, #060b12 100%);
+  color: #f8fafc;
+  overflow-x: hidden;
+}
+
+input,
+select,
+textarea {
+  color-scheme: dark;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+}
+
+@layer components {
+  .glass-panel {
+    @apply border border-white/[0.06] bg-panel/80 shadow-card backdrop-blur-xl;
+  }
+
+  .enterprise-card {
+    @apply rounded-2xl border border-white/[0.06] bg-gradient-to-b from-panel2/90 to-panel/90 shadow-card backdrop-blur-xl;
+  }
+
+  .nav-item-active {
+    @apply bg-gradient-to-r from-gold/90 to-goldLight/90 font-semibold text-navy shadow-glow;
+  }
+
+  .nav-item-idle {
+    @apply text-cream/70 transition hover:bg-white/[0.04] hover:text-cream;
+  }
+
+  .page-shell {
+    @apply mx-auto w-full max-w-[1600px];
+  }
+
+  .main-content {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  @media (min-width: 1024px) {
+    .main-content {
+      padding-bottom: 2rem;
+    }
+  }
+
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  .mobile-scroll-x {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .mobile-scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+}
