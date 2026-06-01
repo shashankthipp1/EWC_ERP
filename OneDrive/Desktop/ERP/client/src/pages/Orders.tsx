@@ -1,20 +1,18 @@
-import { ClipboardList, Download, FileSpreadsheet, Plus, Save, Search, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ChevronDown, Download, FileSpreadsheet, Plus, Save, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { api } from "../api/http";
-import { CategoryFields } from "../components/CategoryFields";
-import { Button, Card, Field, SectionHeader, inputClass } from "../components/ui";
+import { OrderLineTable } from "../components/purchases/OrderLineTable";
+import { PastOrdersList } from "../components/purchases/PastOrdersList";
+import { PurchaseCharts } from "../components/purchases/PurchaseCharts";
+import { Button, Card, PageShell, compactInputClass } from "../components/ui";
 import { SHOP_DISPLAY_NAME } from "../constants/branding";
-import { ACTIVE_PRODUCT_CATEGORIES } from "../data/categories";
 import { usePermissions } from "../hooks/usePermissions";
 import { useProductColors } from "../hooks/useProductColors";
 import {
   FieldKey,
   OrderLineValues,
   emptyOrderLine,
-  formValuesForFields,
-  getOrderFieldDefs,
-  orderLineDisplayLabel,
   orderLineFromProduct,
   orderLineToPayload,
   validateOrderLine
@@ -22,7 +20,7 @@ import {
 import { Product } from "../types/product";
 import { ShopHeader } from "../utils/exporters";
 import { currency, productLabel } from "../utils/format";
-import { downloadOrderListDoc, downloadOrderListPdf, formatSavedOrderItem, savedItemToOrderLine } from "../utils/orderListExport";
+import { downloadOrderListDoc, downloadOrderListPdf, savedItemToOrderLine } from "../utils/orderListExport";
 
 type SavedOrder = {
   _id: string;
@@ -40,6 +38,7 @@ export function Orders() {
   const { colors } = useProductColors();
   const [items, setItems] = useState<Product[]>([]);
   const [invSearch, setInvSearch] = useState("");
+  const [showInventory, setShowInventory] = useState(false);
   const [orderItems, setOrderItems] = useState<OrderLineValues[]>([]);
   const [orders, setOrders] = useState<SavedOrder[]>([]);
   const [suggestions, setSuggestions] = useState<Array<{ product: string; suggestedQuantity: number }>>([]);
@@ -64,7 +63,7 @@ export function Orders() {
   }
 
   async function searchInventory(term: string) {
-    const { data } = await api.get("/inventory", { params: { q: term || undefined, limit: 50 } });
+    const { data } = await api.get("/inventory", { params: { q: term || undefined, limit: 30 } });
     setItems(data.items);
   }
 
@@ -80,7 +79,7 @@ export function Orders() {
 
   function pick(item: Product) {
     setOrderItems((old) => [...old, orderLineFromProduct(item)]);
-    toast.success("Added to order list");
+    toast.success("Added");
   }
 
   function addManualLine() {
@@ -109,20 +108,20 @@ export function Orders() {
   }
 
   function downloadPdf(lines: OrderLineValues[], orderNumber?: string) {
-    if (!lines.length) return toast.error("Add items to the order list first");
+    if (!lines.length) return toast.error("Add items first");
     downloadOrderListPdf(lines, shop, orderNumber);
     toast.success("PDF downloaded");
   }
 
   function downloadDoc(lines: OrderLineValues[], orderNumber?: string) {
-    if (!lines.length) return toast.error("Add items to the order list first");
+    if (!lines.length) return toast.error("Add items first");
     downloadOrderListDoc(lines, shop, orderNumber);
     toast.success("Document downloaded");
   }
 
   function startEdit(order: SavedOrder) {
     const lines = (order.items || []).map(savedItemToOrderLine);
-    if (!lines.length) return toast.error("This order has no items to edit");
+    if (!lines.length) return toast.error("This order has no items");
     setOrderItems(lines);
     setEditingId(order._id);
     toast.success(`Editing ${order.orderNumber}`);
@@ -139,18 +138,18 @@ export function Orders() {
       const err = validateOrderLine(orderItems[i]);
       if (err) return toast.error(`Line ${i + 1}: ${err}`);
     }
-    if (!orderItems.length) return toast.error("Add at least one item");
+    if (!orderItems.length) return toast.error("Add at least one line");
     setSaving(true);
     try {
       const payload = { items: orderItems.map(orderLineToPayload) };
       if (editingId) {
         const { data } = await api.put(`/orders/${editingId}`, payload);
-        toast.success(`Order updated: ${data.order.orderNumber}`);
+        toast.success(`Updated ${data.order.orderNumber}`);
         downloadPdf(orderItems, data.order.orderNumber);
         setEditingId(null);
       } else {
         const { data } = await api.post("/orders", payload);
-        toast.success(`Order list saved: ${data.order.orderNumber}`);
+        toast.success(`Saved ${data.order.orderNumber}`);
         downloadPdf(orderItems, data.order.orderNumber);
       }
       setOrderItems([]);
@@ -164,10 +163,10 @@ export function Orders() {
   }
 
   async function removeOrder(id: string, orderNumber: string) {
-    if (!window.confirm(`Delete order list ${orderNumber}?`)) return;
+    if (!window.confirm(`Delete ${orderNumber}?`)) return;
     try {
       await api.delete(`/orders/${id}`);
-      toast.success("Order list deleted");
+      toast.success("Deleted");
       if (editingId === id) cancelEdit();
       load();
     } catch {
@@ -175,195 +174,145 @@ export function Orders() {
     }
   }
 
-  const grandTotal = canViewCost ? orderItems.reduce((s, i) => s + i.quantity * i.purchasePrice, 0) : 0;
+  const grandTotal = useMemo(
+    () => (canViewCost ? orderItems.reduce((s, i) => s + i.quantity * i.purchasePrice, 0) : 0),
+    [orderItems, canViewCost]
+  );
 
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        eyebrow="Procurement"
-        title="Purchase order lists"
-        subtitle={canManageOrders ? "Build vendor replenishment lists by category" : "View-only — contact admin to edit"}
-        action={
-          canManageOrders ? (
-            <Button onClick={addManualLine}>
-              <Plus size={16} /> Add line manually
-            </Button>
-          ) : undefined
-        }
-      />
+    <PageShell className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Purchases</h1>
+          <p className="mt-1 text-sm text-muted">Build a clean order list line by line — charts update as you type.</p>
+        </div>
+        {canManageOrders && (
+          <Button onClick={addManualLine} size="sm">
+            <Plus size={16} /> New line
+          </Button>
+        )}
+      </div>
 
       {editingId && (
-        <div className="rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-sm text-gold">
-          Editing a saved order — change lines below, then Save.{" "}
-          <button type="button" className="underline" onClick={cancelEdit}>
-            Cancel edit
+        <div className="flex items-center justify-between rounded-lg border border-warning/30 bg-warning/10 px-4 py-2 text-sm">
+          <span>Editing saved list</span>
+          <button type="button" className="font-semibold text-brand underline" onClick={cancelEdit}>
+            Cancel
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <Card>
-          <h2 className="mb-4 font-semibold">Add from Inventory</h2>
-          <div className="mb-3 flex items-center gap-2 rounded-lg border border-line/50 bg-navy/40 px-3">
-            <Search size={16} className="text-cream/50" />
-            <input
-              className="w-full bg-transparent py-2 text-sm outline-none"
-              placeholder="Search products (brand, model, colour…)"
-              value={invSearch}
-              onChange={(e) => setInvSearch(e.target.value)}
-            />
-          </div>
-          <ul className="max-h-72 space-y-2 overflow-y-auto">
-            {items.map((item) => (
-              <li key={item._id} className="flex items-center justify-between rounded-lg border border-line/40 px-3 py-2 text-sm">
-                <span>
-                  <span className="text-xs text-cream/50">{item.category}</span>
-                  <br />
-                  {productLabel(item)}
-                </span>
-                <Button variant="ghost" className="!min-h-8 !px-2" onClick={() => pick(item)}>
-                  <Plus size={14} />
-                </Button>
-              </li>
-            ))}
-            {!items.length && <p className="text-sm text-cream/50">No products match your search.</p>}
-          </ul>
-          {suggestions.length > 0 && (
-            <div className="mt-4">
-              <p className="text-xs font-medium uppercase text-gold">Low stock suggestions</p>
-              <ul className="mt-2 space-y-1 text-sm text-cream/70">
-                {suggestions.slice(0, 5).map((s) => (
-                  <li key={s.product}>
-                    {s.product} — order {s.suggestedQuantity} units
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </Card>
+      <PurchaseCharts
+        lines={orderItems}
+        savedOrders={orders}
+        suggestions={suggestions}
+        showCost={canViewCost}
+        grandTotal={grandTotal}
+      />
 
-        <Card>
-          <p className="mb-4 text-sm text-cream/60">
-            PDF / Word export uses <strong>{SHOP_DISPLAY_NAME}</strong> from Settings (no supplier on the document).
-          </p>
-          <div className="mb-4 rounded-lg border border-line/50 bg-navy/40 px-3 py-2 text-sm">
-            <p className="font-medium text-gold">{shop.shopName}</p>
-            {shop.address && <p className="text-cream/70">{shop.address}</p>}
-            {shop.phone && <p className="text-cream/50">{shop.phone}</p>}
-          </div>
+      <Card className="!p-4 sm:!p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">Order lines</h2>
+          <p className="text-xs text-muted">{shop.shopName}</p>
+        </div>
 
-          <div className="space-y-4">
-            {orderItems.length === 0 && (
-              <p className="text-sm text-cream/50">Search inventory and add items, or add a line manually.</p>
-            )}
-            {orderItems.map((line, i) => (
-              <div key={i} className="rounded-lg border border-line/50 bg-navy/40 p-3">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-gold">{orderLineDisplayLabel(line) || `Line ${i + 1}`}</p>
-                  <button
-                    type="button"
-                    onClick={() => removeLine(i)}
-                    className="rounded p-1 text-danger hover:bg-danger/10"
-                    title="Remove line"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Field label="Category">
-                    <select
-                      className={inputClass}
-                      value={line.category}
-                      onChange={(e) => changeLineCategory(i, e.target.value as OrderLineValues["category"])}
-                    >
-                      {ACTIVE_PRODUCT_CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <CategoryFields
-                    fields={getOrderFieldDefs(line.category, colors)}
-                    values={formValuesForFields(line)}
-                    onChange={(key, value) => updateLine(i, key, value)}
-                    quantity={line.quantity}
-                    colorOptions={colors}
-                  />
-                </div>
+        <OrderLineTable
+          lines={orderItems}
+          colorOptions={colors}
+          canEdit={canManageOrders}
+          onAddLine={addManualLine}
+          onUpdate={updateLine}
+          onCategoryChange={changeLineCategory}
+          onRemove={removeLine}
+        />
+
+        {canManageOrders && (
+          <details className="mt-4 group">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted hover:text-brand">
+              <ChevronDown size={16} className="transition group-open:rotate-180" />
+              Add from inventory search
+            </summary>
+            <div className="mt-3 rounded-xl border border-line bg-surface-2/40 p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <Search size={16} className="text-muted" />
+                <input
+                  className={`${compactInputClass} flex-1`}
+                  placeholder="Search brand, model…"
+                  value={invSearch}
+                  onChange={(e) => setInvSearch(e.target.value)}
+                  onFocus={() => setShowInventory(true)}
+                />
               </div>
-            ))}
-          </div>
-
-          {orderItems.length > 0 && (
-            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Button className="w-full" variant="ghost" onClick={() => downloadPdf(orderItems)}>
-                <Download size={16} /> Download PDF
-              </Button>
-              <Button className="w-full" variant="ghost" onClick={() => downloadDoc(orderItems)}>
-                <FileSpreadsheet size={16} /> Download Word (.doc)
-              </Button>
-            </div>
-          )}
-
-          {canViewCost && grandTotal > 0 && (
-            <p className="mt-4 text-sm text-muted">Estimated cost total: {currency(grandTotal)}</p>
-          )}
-
-          {canManageOrders && (
-            <Button className="mt-4 w-full" onClick={save} disabled={!orderItems.length || saving}>
-              <Save size={16} /> {saving ? "Saving…" : editingId ? "Update order list" : "Save & download PDF"}
-            </Button>
-          )}
-        </Card>
-      </div>
-
-      <Card>
-        <h2 className="mb-4 flex items-center gap-2 font-semibold">
-          <ClipboardList size={18} /> Past Order Lists
-        </h2>
-        <div className="space-y-3">
-          {orders.map((o) => {
-            const lines = (o.items || []).map(savedItemToOrderLine);
-            return (
-              <div key={o._id} className="rounded-lg border border-line/40 px-3 py-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium">{o.orderNumber}</span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-gold/20 px-2 py-0.5 text-xs text-gold">{o.status}</span>
-                    {canManageOrders && (
-                      <>
-                        <Button variant="ghost" className="!min-h-8 !px-2 !text-xs" onClick={() => startEdit(o)}>
-                          Edit
-                        </Button>
-                        <Button variant="ghost" className="!min-h-8 !px-2 !text-xs text-danger" onClick={() => removeOrder(o._id, o.orderNumber)}>
-                          Delete
-                        </Button>
-                      </>
-                    )}
-                    <Button variant="ghost" className="!min-h-8 !px-2 !text-xs" onClick={() => downloadPdf(lines, o.orderNumber)}>
-                      <Download size={14} /> PDF
-                    </Button>
-                    <Button variant="ghost" className="!min-h-8 !px-2 !text-xs" onClick={() => downloadDoc(lines, o.orderNumber)}>
-                      <FileSpreadsheet size={14} /> DOC
-                    </Button>
+              {(showInventory || invSearch) && (
+                <ul className="max-h-40 space-y-1 overflow-y-auto">
+                  {items.map((item) => (
+                    <li key={item._id}>
+                      <button
+                        type="button"
+                        onClick={() => pick(item)}
+                        className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-sm hover:bg-brand/10"
+                      >
+                        <span className="truncate">
+                          <span className="text-[10px] text-muted">{item.category}</span>
+                          <br />
+                          {productLabel(item)}
+                        </span>
+                        <Plus size={14} className="shrink-0 text-brand" />
+                      </button>
+                    </li>
+                  ))}
+                  {!items.length && <p className="py-2 text-center text-xs text-muted">No matches</p>}
+                </ul>
+              )}
+              {suggestions.length > 0 && (
+                <div className="mt-3 border-t border-line pt-2">
+                  <p className="text-[10px] font-bold uppercase text-warning">Low stock — tap to add</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {suggestions.slice(0, 6).map((s) => (
+                      <span key={s.product} className="rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning">
+                        {s.product} ×{s.suggestedQuantity}
+                      </span>
+                    ))}
                   </div>
                 </div>
-                {o.items?.length ? (
-                  <ul className="mt-2 space-y-1 text-xs text-cream/60">
-                    {o.items.map((item, idx) => (
-                      <li key={idx}>
-                        {item.category}: {formatSavedOrderItem(item)} — qty {item.quantity}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            );
-          })}
-          {!orders.length && <p className="text-cream/50">No saved order lists yet.</p>}
-        </div>
+              )}
+            </div>
+          </details>
+        )}
+
+        {orderItems.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+            {canViewCost && grandTotal > 0 && (
+              <span className="mr-auto text-sm text-muted">
+                Est. cost: <strong className="text-cream">{currency(grandTotal)}</strong>
+              </span>
+            )}
+            <Button variant="secondary" size="sm" onClick={() => downloadPdf(orderItems)}>
+              <Download size={14} /> PDF
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => downloadDoc(orderItems)}>
+              <FileSpreadsheet size={14} /> Word
+            </Button>
+            {canManageOrders && (
+              <Button size="sm" onClick={save} disabled={saving}>
+                <Save size={14} /> {saving ? "Saving…" : editingId ? "Update" : "Save"}
+              </Button>
+            )}
+          </div>
+        )}
       </Card>
-    </div>
+
+      <Card className="!p-4 sm:!p-5">
+        <h2 className="mb-3 text-base font-semibold">Saved purchase lists</h2>
+        <PastOrdersList
+          orders={orders}
+          canManage={canManageOrders}
+          onEdit={startEdit}
+          onDelete={removeOrder}
+          onPdf={downloadPdf}
+          onDoc={downloadDoc}
+        />
+      </Card>
+    </PageShell>
   );
 }

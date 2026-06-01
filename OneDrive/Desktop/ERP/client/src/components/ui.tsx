@@ -61,6 +61,10 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 export const inputClass =
   "w-full min-h-[44px] touch-manipulation rounded-xl border border-line bg-navyLight/60 px-3.5 py-2.5 text-base text-cream shadow-inner outline-none transition placeholder:text-muted focus:border-brand/50 focus:ring-2 focus:ring-brand/15 sm:text-sm";
 
+/** Compact inputs for tables and dense forms */
+export const compactInputClass =
+  "w-full min-w-0 h-9 rounded-lg border border-line bg-surface-2/90 px-2.5 text-sm text-cream outline-none transition placeholder:text-muted focus:border-brand/40 focus:ring-1 focus:ring-brand/20";
+
 export function Badge({
   children,
   tone = "neutral",
