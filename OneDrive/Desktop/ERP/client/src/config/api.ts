@@ -15,6 +15,9 @@ function normalizeApiBaseUrl(url: string): string {
 
 function sameOriginApiBase(): string | null {
   if (typeof window === "undefined") return null;
+  const { hostname } = window.location;
+  // Netlify/Vercel/etc. only host static files — API is on Render
+  if (hostname.endsWith(".netlify.app") || hostname === "netlify.app") return null;
   return `${window.location.origin}/api`;
 }
 
@@ -42,8 +45,11 @@ export function getApiBaseUrl(): string {
   );
 }
 
-/** Logged once in dev tools to verify deployment API target. */
+/** Logged in dev and on split hosts (Netlify) to verify API target. */
 export function logApiConfig(): void {
-  if (!import.meta.env.DEV) return;
+  const onNetlify =
+    typeof window !== "undefined" &&
+    (window.location.hostname.endsWith(".netlify.app") || window.location.hostname === "netlify.app");
+  if (!import.meta.env.DEV && !onNetlify) return;
   console.info("[api] baseURL:", getApiBaseUrl());
 }

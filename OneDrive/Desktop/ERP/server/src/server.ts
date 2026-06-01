@@ -6,7 +6,7 @@ import morgan from "morgan";
 import path from "path";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
-import { buildAllowedOrigins, createCorsOptions } from "./config/cors.js";
+import { buildAllowedOrigins, createCorsOptions, logCorsPolicy } from "./config/cors.js";
 import { connectDb } from "./config/db.js";
 import { logStartupConfig, validateEnv } from "./config/env.js";
 import { ensureAdminUser } from "./utils/ensureAdmin.js";
@@ -31,9 +31,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientDist = path.resolve(__dirname, "../../client/dist");
 const allowedOrigins = buildAllowedOrigins();
 const corsOptions = createCorsOptions(allowedOrigins);
+logCorsPolicy(allowedOrigins);
 
 const app = express();
-app.set("trust proxy", 1);
+// Required on Render (reverse proxy) — must be set before express-rate-limit
+app.set("trust proxy", true);
 
 app.use(
   helmet({
@@ -52,7 +54,8 @@ app.use(
     limit: 500,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => req.method === "OPTIONS"
+    skip: (req) => req.method === "OPTIONS",
+    validate: { xForwardedForHeader: false }
   })
 );
 

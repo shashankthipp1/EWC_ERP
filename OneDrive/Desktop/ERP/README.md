@@ -46,6 +46,16 @@ Deploy with [render.yaml](./render.yaml) or **Build:** `npm run install:all && n
 4. Open the app, DevTools → Network → `POST /api/auth/login` must be **same origin** or show `Access-Control-Allow-Origin` matching your site.
 5. Sign up, then log in; confirm `erp_token` in localStorage.
 
+### Netlify frontend + Render API
+
+1. Repo includes [`netlify.toml`](./netlify.toml) — base `client`, `VITE_API_URL=https://ewc-erp.onrender.com`.
+2. On **Render** (API), set `CLIENT_URL` to your Netlify URL (no trailing slash), e.g.  
+   `https://astonishing-kashata-db13f8.netlify.app`  
+   Or comma-separate multiple origins. `*.netlify.app` is also allowed automatically after redeploy.
+3. Redeploy **both** Netlify and Render after env/code changes.
+4. In browser DevTools → Network, login should call  
+   `https://ewc-erp.onrender.com/api/auth/login` (not `netlify.app/api/...`).
+
 ### Troubleshooting CORS on Render
 
 - **Monolith:** Do not set `VITE_API_URL` to a different host unless intentional.
