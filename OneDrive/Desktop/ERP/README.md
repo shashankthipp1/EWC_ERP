@@ -25,17 +25,17 @@ npm run dev
 
 ## Production (Render)
 
-**Live API:** https://erp-1-3f4g.onrender.com  
+**Live API:** https://ewc-erp.onrender.com  
 
 | Use case | API URL |
 |----------|---------|
-| App hosted on Render (same service) | `/api` (automatic) |
-| Local dev against Render | `client/.env.local` → `VITE_API_URL=https://erp-1-3f4g.onrender.com/api` |
-| Default production build (remote API) | `https://erp-1-3f4g.onrender.com/api` |
+| Production build | `client/.env.production` → `VITE_API_URL=https://ewc-erp.onrender.com` |
+| Local dev (default) | `client/.env.development` → `VITE_API_URL=http://localhost:5000` |
+| Local UI against live API | `client/.env.local` → `VITE_API_URL=https://ewc-erp.onrender.com` |
 
 Deploy with [render.yaml](./render.yaml) or set **Build:** `npm run install:all && npm run build` and **Start:** `npm run start --prefix server`.
 
-Set on Render: `MONGODB_URI`, `JWT_SECRET`, `CLIENT_URL=https://erp-1-3f4g.onrender.com`
+Set on Render: `MONGODB_URI`, `JWT_SECRET`, `CLIENT_URL=https://ewc-erp.onrender.com`
 
 Create an account via **Sign up** on the login screen (first user can be promoted to `admin` in MongoDB if needed).
 

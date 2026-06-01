@@ -1,22 +1,28 @@
-/** Live backend on Render */
-export const RENDER_API_URL = "https://erp-1-3f4g.onrender.com/api";
+/** Production backend (fallback when VITE_API_URL is unset in production builds). */
+export const PRODUCTION_API_HOST = "https://ewc-erp.onrender.com";
 
 /**
- * API base URL:
- * - VITE_API_URL in .env overrides everything
- * - Dev → local server
- * - Production on Render → same-origin /api
- * - Production elsewhere → Render API URL
+ * Ensures the base URL ends with `/api` (Express mounts routes under /api).
+ */
+function normalizeApiBaseUrl(url: string): string {
+  const trimmed = url.replace(/\/$/, "");
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+}
+
+/**
+ * API base URL for axios and fetch wrappers.
+ * - VITE_API_URL in .env.development / .env.production / .env.local overrides everything
+ * - Production fallback → PRODUCTION_API_HOST
  */
 export function getApiBaseUrl(): string {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL.replace(/\/$/, "");
+  const fromEnv = import.meta.env.VITE_API_URL?.trim();
+  if (fromEnv) {
+    return normalizeApiBaseUrl(fromEnv);
   }
-  if (import.meta.env.DEV) {
-    return "http://localhost:5000/api";
+  if (import.meta.env.PROD) {
+    return normalizeApiBaseUrl(PRODUCTION_API_HOST);
   }
-  if (typeof window !== "undefined" && window.location.hostname.endsWith("onrender.com")) {
-    return "/api";
-  }
-  return RENDER_API_URL;
+  throw new Error(
+    "VITE_API_URL is not set. Use client/.env.development (local) or client/.env.local."
+  );
 }
