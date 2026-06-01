@@ -5,7 +5,9 @@ import { api } from "../api/http";
 import { CategoryFields } from "../components/CategoryFields";
 import { Button, Card, Field, SectionHeader, inputClass } from "../components/ui";
 import { SHOP_DISPLAY_NAME } from "../constants/branding";
-import { PRODUCT_CATEGORIES } from "../data/categories";
+import { ACTIVE_PRODUCT_CATEGORIES } from "../data/categories";
+import { usePermissions } from "../hooks/usePermissions";
+import { useProductColors } from "../hooks/useProductColors";
 import {
   FieldKey,
   OrderLineValues,
@@ -34,6 +36,8 @@ type SavedOrder = {
 const defaultShop: ShopHeader = { shopName: SHOP_DISPLAY_NAME, address: "", phone: "" };
 
 export function Orders() {
+  const { canManageOrders, canViewCost } = usePermissions();
+  const { colors } = useProductColors();
   const [items, setItems] = useState<Product[]>([]);
   const [invSearch, setInvSearch] = useState("");
   const [orderItems, setOrderItems] = useState<OrderLineValues[]>([]);
@@ -171,17 +175,20 @@ export function Orders() {
     }
   }
 
-  const grandTotal = orderItems.reduce((s, i) => s + i.quantity * i.purchasePrice, 0);
+  const grandTotal = canViewCost ? orderItems.reduce((s, i) => s + i.quantity * i.purchasePrice, 0) : 0;
 
   return (
     <div className="space-y-6">
       <SectionHeader
         eyebrow="Procurement"
-        title="Order List Manager"
+        title="Purchase order lists"
+        subtitle={canManageOrders ? "Build vendor replenishment lists by category" : "View-only — contact admin to edit"}
         action={
-          <Button onClick={addManualLine}>
-            <Plus size={16} /> Add line manually
-          </Button>
+          canManageOrders ? (
+            <Button onClick={addManualLine}>
+              <Plus size={16} /> Add line manually
+            </Button>
+          ) : undefined
         }
       />
 
@@ -269,7 +276,7 @@ export function Orders() {
                       value={line.category}
                       onChange={(e) => changeLineCategory(i, e.target.value as OrderLineValues["category"])}
                     >
-                      {PRODUCT_CATEGORIES.map((c) => (
+                      {ACTIVE_PRODUCT_CATEGORIES.map((c) => (
                         <option key={c} value={c}>
                           {c}
                         </option>
@@ -277,9 +284,11 @@ export function Orders() {
                     </select>
                   </Field>
                   <CategoryFields
-                    fields={getOrderFieldDefs(line.category)}
+                    fields={getOrderFieldDefs(line.category, colors)}
                     values={formValuesForFields(line)}
                     onChange={(key, value) => updateLine(i, key, value)}
+                    quantity={line.quantity}
+                    colorOptions={colors}
                   />
                 </div>
               </div>
@@ -297,11 +306,15 @@ export function Orders() {
             </div>
           )}
 
-          {grandTotal > 0 && <p className="mt-4 text-sm text-cream/60">Estimated total (internal): {currency(grandTotal)}</p>}
+          {canViewCost && grandTotal > 0 && (
+            <p className="mt-4 text-sm text-muted">Estimated cost total: {currency(grandTotal)}</p>
+          )}
 
-          <Button className="mt-4 w-full" onClick={save} disabled={!orderItems.length || saving}>
-            <Save size={16} /> {saving ? "Saving…" : editingId ? "Update order list" : "Save & download PDF"}
-          </Button>
+          {canManageOrders && (
+            <Button className="mt-4 w-full" onClick={save} disabled={!orderItems.length || saving}>
+              <Save size={16} /> {saving ? "Saving…" : editingId ? "Update order list" : "Save & download PDF"}
+            </Button>
+          )}
         </Card>
       </div>
 
@@ -318,12 +331,16 @@ export function Orders() {
                   <span className="font-medium">{o.orderNumber}</span>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-gold/20 px-2 py-0.5 text-xs text-gold">{o.status}</span>
-                    <Button variant="ghost" className="!min-h-8 !px-2 !text-xs" onClick={() => startEdit(o)}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" className="!min-h-8 !px-2 !text-xs text-danger" onClick={() => removeOrder(o._id, o.orderNumber)}>
-                      Delete
-                    </Button>
+                    {canManageOrders && (
+                      <>
+                        <Button variant="ghost" className="!min-h-8 !px-2 !text-xs" onClick={() => startEdit(o)}>
+                          Edit
+                        </Button>
+                        <Button variant="ghost" className="!min-h-8 !px-2 !text-xs text-danger" onClick={() => removeOrder(o._id, o.orderNumber)}>
+                          Delete
+                        </Button>
+                      </>
+                    )}
                     <Button variant="ghost" className="!min-h-8 !px-2 !text-xs" onClick={() => downloadPdf(lines, o.orderNumber)}>
                       <Download size={14} /> PDF
                     </Button>

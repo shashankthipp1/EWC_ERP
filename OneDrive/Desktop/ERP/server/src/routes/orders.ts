@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { protect } from "../middleware/auth.js";
+import { protect, requireRole } from "../middleware/auth.js";
+import { canViewCost } from "../utils/roles.js";
 import { InventoryItem } from "../models/InventoryItem.js";
 import { OrderList } from "../models/OrderList.js";
 import { Supplier } from "../models/Supplier.js";
@@ -8,9 +9,20 @@ import { normalizeOrderItem, productDisplayLabel } from "../utils/productFields.
 import { serializeOrder } from "../utils/orderSerialize.js";
 
 const router = Router();
+const writeRoles = requireRole("admin", "manager");
 router.use(protect);
 
-router.get("/reorder-suggestions", async (_req, res, next) => {
+function sanitizeOrder(order: ReturnType<typeof serializeOrder>, role?: string) {
+  if (canViewCost(role)) return order;
+  const o = { ...order, items: (order.items || []).map((item) => ({ ...item, data: { ...item.data } })) };
+  delete (o as { totalEstimatedCost?: number }).totalEstimatedCost;
+  for (const item of o.items) {
+    if (item.data && typeof item.data === "object") delete (item.data as Record<string, unknown>).purchasePrice;
+  }
+  return o;
+}
+
+router.get("/reorder-suggestions", async (req, res, next) => {
   try {
     const items = await InventoryItem.find().sort({ updatedAt: -1 }).limit(500);
     const suggestions = items
@@ -33,7 +45,12 @@ router.get("/reorder-suggestions", async (_req, res, next) => {
         suggestedQuantity: Math.max(5, item.minimumStock * 3 - item.currentStock),
         estimatedCost: item.purchasePrice * Math.max(5, item.minimumStock * 3 - item.currentStock)
       }));
-    res.json({ suggestions });
+    const payload = suggestions.map((s) => {
+      const row = { ...s };
+      if (!canViewCost(req.user?.role)) delete (row as { estimatedCost?: number }).estimatedCost;
+      return row;
+    });
+    res.json({ suggestions: payload });
   } catch (err) {
     next(err);
   }
@@ -57,10 +74,10 @@ router.post("/suppliers", async (req, res, next) => {
   }
 });
 
-router.get("/", async (_req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
     const orders = await OrderList.find().sort({ createdAt: -1 }).limit(200);
-    res.json({ orders: orders.map((o) => serializeOrder(o)) });
+    res.json({ orders: orders.map((o) => sanitizeOrder(serializeOrder(o), req.user?.role)) });
   } catch (err) {
     next(err);
   }
@@ -70,13 +87,13 @@ router.get("/:id", async (req, res, next) => {
   try {
     const order = await OrderList.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
-    res.json({ order: serializeOrder(order) });
+    res.json({ order: sanitizeOrder(serializeOrder(order), req.user?.role) });
   } catch (err) {
     next(err);
   }
 });
 
-router.post("/", async (req, res, next) => {
+router.post("/", writeRoles, async (req, res, next) => {
   try {
     const items = (req.body.items || []).map((item: Record<string, unknown>) => normalizeOrderItem(item));
     if (!items.length) return res.status(400).json({ message: "Add at least one item to the order list" });
@@ -95,13 +112,13 @@ router.post("/", async (req, res, next) => {
       items,
       createdBy: req.user?.id
     });
-    res.status(201).json({ order: serializeOrder(order) });
+    res.status(201).json({ order: sanitizeOrder(serializeOrder(order), req.user?.role) });
   } catch (err) {
     next(err);
   }
 });
 
-router.put("/:id", async (req, res, next) => {
+router.put("/:id", writeRoles, async (req, res, next) => {
   try {
     const existing = await OrderList.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Order not found" });
@@ -123,13 +140,13 @@ router.put("/:id", async (req, res, next) => {
     }
 
     const order = await OrderList.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
-    res.json({ order: serializeOrder(order!) });
+    res.json({ order: sanitizeOrder(serializeOrder(order!), req.user?.role) });
   } catch (err) {
     next(err);
   }
 });
 
-router.delete("/:id", async (req, res, next) => {
+router.delete("/:id", writeRoles, async (req, res, next) => {
   try {
     const order = await OrderList.findByIdAndDelete(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });

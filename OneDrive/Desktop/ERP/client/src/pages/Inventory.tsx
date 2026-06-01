@@ -17,7 +17,9 @@ import { Column, DataTable } from "../components/DataTable";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { Button, Card, Field, MetricCard, SectionHeader, inputClass } from "../components/ui";
 import { APP_NAME } from "../constants/branding";
-import { PRODUCT_CATEGORIES } from "../data/categories";
+import { ACTIVE_PRODUCT_CATEGORIES, PRODUCT_CATEGORIES, WALL_CLOCK_CATEGORY } from "../data/categories";
+import { usePermissions } from "../hooks/usePermissions";
+import { useProductColors } from "../hooks/useProductColors";
 import {
   FieldKey,
   ProductFormValues,
@@ -36,6 +38,8 @@ import { exportRowsToExcel, exportRowsToPdf } from "../utils/exporters";
 const defaultShop = { shopName: APP_NAME, address: "", phone: "" };
 
 export function Inventory({ embedded = false }: { embedded?: boolean }) {
+  const { canViewCost, canManageInventory } = usePermissions();
+  const { colors, addColor } = useProductColors();
   const [items, setItems] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -195,7 +199,7 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
   }
 
   const columns: Column<Product>[] = [
-    { key: "productId", header: "ID", render: (r) => <span className="font-mono text-gold">{r.productId}</span> },
+    { key: "productId", header: "ID", render: (r) => <span className="font-mono text-brand">{r.productId}</span> },
     { key: "category", header: "Category" },
     {
       key: "brand",
@@ -205,43 +209,58 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
     {
       key: "currentStock",
       header: "Qty",
-      render: (r) => (
-        <input
-          type="number"
-          min={0}
-          className={`w-20 rounded border border-line/60 bg-navy/60 px-2 py-1 text-sm ${r.currentStock <= r.minimumStock ? "font-semibold text-danger" : ""}`}
-          defaultValue={r.currentStock}
-          onBlur={(e) => {
-            const next = Number(e.target.value);
-            if (next !== r.currentStock) saveStock(r._id, next);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          }}
-          title="Change quantity and press Enter or click away to save"
-        />
-      )
+      render: (r) =>
+        canManageInventory ? (
+          <input
+            type="number"
+            min={0}
+            className={`w-20 rounded border border-line bg-navyLight/60 px-2 py-1 text-sm ${r.currentStock <= r.minimumStock ? "font-semibold text-danger" : ""}`}
+            defaultValue={r.currentStock}
+            onBlur={(e) => {
+              const next = Number(e.target.value);
+              if (next !== r.currentStock) saveStock(r._id, next);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+          />
+        ) : (
+          <span className={r.currentStock <= r.minimumStock ? "font-semibold text-danger" : ""}>{r.currentStock}</span>
+        )
     },
-    { key: "purchasePrice", header: "Cost (each)", render: (r) => currency(r.purchasePrice) },
+    ...(canViewCost
+      ? [{ key: "purchasePrice", header: "Cost", render: (r: Product) => currency(r.purchasePrice ?? 0) } as Column<Product>]
+      : []),
     {
-      key: "actions",
-      header: "Actions",
-      render: (r) => (
-        <div className="flex gap-2">
-          <button onClick={() => openEdit(r)} className="rounded p-1.5 text-gold hover:bg-gold/10" title="Edit">
-            <Settings size={16} />
-          </button>
-          <button onClick={() => setDeleteTarget(r)} className="rounded p-1.5 text-danger hover:bg-danger/10" title="Delete">
-            <LogOut size={16} />
-          </button>
-        </div>
-      )
-    }
+      key: "sellingPrice",
+      header: "Sell",
+      render: (r) => currency(r.sellingPrice)
+    },
+    ...(canManageInventory
+      ? [
+          {
+            key: "actions",
+            header: "Actions",
+            render: (r: Product) => (
+              <div className="flex gap-2">
+                <button type="button" onClick={() => openEdit(r)} className="rounded p-1.5 text-brand hover:bg-brand/10" title="Edit">
+                  <Settings size={16} />
+                </button>
+                <button type="button" onClick={() => setDeleteTarget(r)} className="rounded p-1.5 text-danger hover:bg-danger/10" title="Delete">
+                  <LogOut size={16} />
+                </button>
+              </div>
+            )
+          } as Column<Product>
+        ]
+      : [])
   ];
 
-  const inventoryValue = items.reduce((s, i) => s + i.purchasePrice * i.currentStock, 0);
+  const inventoryValue = canViewCost
+    ? items.reduce((s, i) => s + (i.purchasePrice ?? 0) * i.currentStock, 0)
+    : 0;
   const lowStockCount = items.filter((i) => i.currentStock <= i.minimumStock).length;
-  const inventoryFields = getInventoryFieldDefs(form.category);
+  const inventoryFields = getInventoryFieldDefs(form.category, colors).filter((f) => !f.adminOnly || canViewCost);
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -251,20 +270,24 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
           title="Inventory Management"
           action={
             <div className="flex flex-wrap gap-2">
-              <Button variant="ghost" onClick={() => exportData("excel")}>
-                <FileSpreadsheet size={16} /> Excel
-              </Button>
-              <Button variant="ghost" onClick={() => exportData("pdf")}>
-                <Download size={16} /> PDF
-              </Button>
-              <Button onClick={openCreate}>
-                <Plus size={16} /> Add Product
-              </Button>
+              {canManageInventory && (
+                <>
+                  <Button variant="ghost" onClick={() => exportData("excel")}>
+                    <FileSpreadsheet size={16} /> Excel
+                  </Button>
+                  <Button variant="ghost" onClick={() => exportData("pdf")}>
+                    <Download size={16} /> PDF
+                  </Button>
+                  <Button onClick={openCreate}>
+                    <Plus size={16} /> Add Product
+                  </Button>
+                </>
+              )}
             </div>
           }
         />
       )}
-      {embedded && (
+      {embedded && canManageInventory && (
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={() => exportData("excel")}>
             <FileSpreadsheet size={16} /> Excel
@@ -277,11 +300,13 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
 
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard label="Products" value={total} detail="Matching current filters" icon={Boxes} />
-        <MetricCard label="Stock Value" value={currency(inventoryValue)} detail="Purchase price × qty (this page)" icon={Boxes} tone="gold" />
+        {canViewCost && (
+          <MetricCard label="Stock value (cost)" value={currency(inventoryValue)} detail="Cost × qty on this page" icon={Boxes} tone="brand" />
+        )}
         <MetricCard label="Low Stock" value={lowStockCount} detail="At or below minimum level" icon={Boxes} tone="danger" />
       </div>
 
-      {showForm && (
+      {showForm && canManageInventory && (
         <Card>
           <h2 className="mb-1 text-lg font-semibold">{editing ? "Edit Product" : "Add to Inventory"}</h2>
           <p className="mb-4 text-sm text-cream/60">
@@ -295,14 +320,25 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
                 disabled={!!editing}
                 onChange={(e) => setForm(emptyProduct(e.target.value as Product["category"]))}
               >
-                {PRODUCT_CATEGORIES.map((c) => (
+                {ACTIVE_PRODUCT_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
                 ))}
               </select>
             </Field>
-            <CategoryFields fields={inventoryFields} values={formValuesForFields(form)} onChange={updateField} />
+            <CategoryFields
+              fields={inventoryFields}
+              values={formValuesForFields(form)}
+              onChange={updateField}
+              quantity={form.currentStock}
+              colorOptions={colors}
+              canAddColors={canManageInventory}
+              onAddColor={async (c) => {
+                await addColor(c);
+                toast.success("Color added to palette");
+              }}
+            />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end md:col-span-2 lg:col-span-3">
               <Button type="submit" className="w-full sm:w-auto" disabled={saving}>
                 {saving ? "Saving…" : editing ? "Update" : "Add to inventory"}
@@ -315,9 +351,10 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
         </Card>
       )}
 
+      {canManageInventory && (
       <Card>
         <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-          <SlidersHorizontal size={20} className="text-gold" /> Bulk Stock Update
+          <SlidersHorizontal size={20} className="text-brand" /> Bulk Stock Update
         </h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_120px_auto]">
           <select className={inputClass} value={bulkId} onChange={(e) => setBulkId(e.target.value)}>
@@ -332,6 +369,7 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
           <Button className="w-full sm:w-auto" onClick={bulkStock}>Add Stock</Button>
         </div>
       </Card>
+      )}
 
       <Card>
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
@@ -357,7 +395,7 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
           <div className="flex flex-col gap-2 sm:flex-row sm:col-span-2 lg:col-span-2">
             <select className={inputClass} value={filter.sortBy} onChange={(e) => setFilter({ ...filter, sortBy: e.target.value })}>
               <option value="currentStock">Sort: Stock</option>
-              <option value="purchasePrice">Sort: Cost</option>
+              {canViewCost && <option value="purchasePrice">Sort: Cost</option>}
               <option value="category">Sort: Category</option>
               <option value="brand">Sort: Brand</option>
             </select>

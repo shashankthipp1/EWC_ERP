@@ -21,17 +21,32 @@ router.get("/", async (_req, res, next) => {
 
 router.put("/", requireAdmin, async (req, res, next) => {
   try {
-    const settings = await Settings.findOneAndUpdate(
-      {},
-      {
-        shopName: req.body.shopName,
-        address: req.body.address,
-        phone: req.body.phone,
-        defaultMinimumStock: Number(req.body.defaultMinimumStock ?? 5)
-      },
-      { new: true, upsert: true }
-    );
+    const update: Record<string, unknown> = {
+      shopName: req.body.shopName,
+      address: req.body.address,
+      phone: req.body.phone,
+      defaultMinimumStock: Number(req.body.defaultMinimumStock ?? 5)
+    };
+    if (Array.isArray(req.body.productColors)) {
+      update.productColors = req.body.productColors.map((c: string) => String(c).trim()).filter(Boolean);
+    }
+    const settings = await Settings.findOneAndUpdate({}, update, { new: true, upsert: true });
     res.json({ settings });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/colors", requireAdmin, async (req, res, next) => {
+  try {
+    const color = String(req.body.color || "").trim();
+    if (!color) return res.status(400).json({ message: "Color name required" });
+    const settings = await getShopSettings();
+    if (!settings.productColors.includes(color)) {
+      settings.productColors.push(color);
+      await settings.save();
+    }
+    res.json({ productColors: settings.productColors });
   } catch (err) {
     next(err);
   }

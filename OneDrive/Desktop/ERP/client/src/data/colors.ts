@@ -16,8 +16,8 @@ export const PRODUCT_COLOR_OPTIONS = [
   "Multicolor"
 ] as const;
 
-/** Build select options, keeping any existing value (e.g. from inventory or Ajanta catalog). */
-export function colorSelectOptions(existing?: string): string[] {
+/** Build select options, keeping any existing value and server-managed palette. */
+export function colorSelectOptions(existing?: string, fromServer: readonly string[] = []): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   const add = (c: string) => {
@@ -27,9 +27,9 @@ export function colorSelectOptions(existing?: string): string[] {
     out.push(t);
   };
   if (existing) {
-    existing.split(/[|/]/).forEach((part) => add(part.replace(/\s+/g, " ")));
-    add(existing.replace(/\|/g, " / "));
+    existing.split(/[|/,]/).forEach((part) => add(part.replace(/\s+/g, " ")));
   }
+  for (const c of fromServer) add(c);
   for (const c of PRODUCT_COLOR_OPTIONS) add(c);
   return out;
 }

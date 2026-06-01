@@ -7,8 +7,9 @@ export type Product = {
   brand: string;
   modelNumber: string;
   colorVariant: string;
-  purchasePrice: number;
+  purchasePrice?: number;
   sellingPrice: number;
+  mrp?: number;
   currentStock: number;
   minimumStock: number;
   batteryType: string;

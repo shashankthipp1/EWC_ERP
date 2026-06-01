@@ -1,16 +1,21 @@
 import {
   ACCESSORY_CATEGORY,
+  ACCESSORY_TYPES,
+  ALARM_CLOCK_CATEGORY,
   BATTERY_CATEGORY,
+  CALCULATOR_CATEGORY,
+  categoryOmitsColorField,
+  categoryUsesVariant,
+  isBatteryCategory,
+  LEGACY_BATTERY_CATEGORY,
+  normalizeCategory,
   PRODUCT_CATEGORIES,
   ProductCategory,
-  STANDARD_CATEGORIES,
-  WATCH_CATEGORY
+  TORCH_CATEGORY,
+  TRIMMER_CATEGORY,
+  TRIMMER_VARIANTS,
+  WALL_CLOCK_CATEGORY
 } from "./categories";
-import { PRODUCT_COLOR_OPTIONS } from "./colors";
-
-export const STRAP_TYPES = ["Chain", "Belt"] as const;
-export const WATCH_DISPLAY_TYPES = ["Simple", "Day and Date"] as const;
-export const ACCESSORY_TYPES = ["Charger", "Cable", "Case", "Screen Guard", "Earphone", "Power Bank", "Other"] as const;
 
 export type FieldKey =
   | "brand"
@@ -18,20 +23,22 @@ export type FieldKey =
   | "colorVariant"
   | "batteryType"
   | "accessoryType"
-  | "accessoryName"
   | "strapType"
   | "watchDisplay"
   | "currentStock"
   | "purchasePrice"
+  | "sellingPrice"
+  | "mrp"
   | "quantity";
 
 export type FieldDef = {
   key: FieldKey;
   label: string;
-  type: "text" | "number" | "select";
+  type: "text" | "number" | "select" | "multiColor";
   options?: readonly string[];
   required?: boolean;
   placeholder?: string;
+  adminOnly?: boolean;
 };
 
 export type ProductFormValues = {
@@ -41,6 +48,7 @@ export type ProductFormValues = {
   colorVariant: string;
   purchasePrice: number;
   sellingPrice: number;
+  mrp: number;
   currentStock: number;
   minimumStock: number;
   batteryType: string;
@@ -64,67 +72,87 @@ export type OrderLineValues = {
   purchasePrice: number;
 };
 
-export function isStandardCategory(category: string) {
-  return (STANDARD_CATEGORIES as readonly string[]).includes(category);
+export function parseColorsFromVariant(value: string): string[] {
+  return value
+    .split(/[|,]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
-export function getInventoryFieldDefs(category: string): FieldDef[] {
-  if (category === BATTERY_CATEGORY) {
+export function joinColors(colors: string[]): string {
+  return colors.filter(Boolean).join(" | ");
+}
+
+export function getInventoryFieldDefs(category: string, colorOptions: readonly string[] = []): FieldDef[] {
+  const c = normalizeCategory(category);
+  const colors = colorOptions.length ? colorOptions : [];
+
+  if (c === WALL_CLOCK_CATEGORY) {
     return [
-      { key: "brand", label: "Brand", type: "text", required: true },
-      {
-        key: "batteryType",
-        label: "Battery number",
-        type: "text",
-        required: true,
-        placeholder: "e.g. AA, CR2032, LR44 — enter any size"
-      },
-      { key: "currentStock", label: "Quantity", type: "number", required: true },
-      { key: "purchasePrice", label: "Purchase price (each) ₹", type: "number", required: true }
-    ];
-  }
-  if (category === ACCESSORY_CATEGORY) {
-    return [
-      { key: "accessoryType", label: "Type of accessory", type: "select", options: ACCESSORY_TYPES, required: true },
-      { key: "modelNumber", label: "Accessory name", type: "text", required: true },
-      { key: "currentStock", label: "Quantity", type: "number", required: true },
-      { key: "purchasePrice", label: "Purchase price (each) ₹", type: "number", required: true }
-    ];
-  }
-  if (category === WATCH_CATEGORY) {
-    return [
-      { key: "brand", label: "Brand", type: "text", required: true },
-      { key: "strapType", label: "Chain or belt", type: "select", options: STRAP_TYPES, required: true },
-      { key: "watchDisplay", label: "Simple or day & date", type: "select", options: WATCH_DISPLAY_TYPES, required: true },
-      { key: "currentStock", label: "Quantity", type: "number", required: true },
-      { key: "purchasePrice", label: "Purchase price (each) ₹", type: "number", required: true }
-    ];
-  }
-  if (isStandardCategory(category)) {
-    return [
-      { key: "brand", label: "Brand", type: "text", required: true },
+      { key: "brand", label: "Brand name", type: "text", required: true },
       { key: "modelNumber", label: "Model number", type: "text", required: true },
-      { key: "colorVariant", label: "Color", type: "select", options: PRODUCT_COLOR_OPTIONS, required: true },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
-      { key: "purchasePrice", label: "Purchase price (each) ₹", type: "number", required: true }
+      { key: "colorVariant", label: "Colors", type: "multiColor", options: colors, required: true },
+      { key: "mrp", label: "MRP ₹", type: "number", required: true },
+      { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
+      { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
+    ];
+  }
+  if (c === ALARM_CLOCK_CATEGORY) {
+    return [
+      { key: "brand", label: "Brand", type: "text", required: true },
+      { key: "modelNumber", label: "Model", type: "text", required: true },
+      { key: "currentStock", label: "Quantity", type: "number", required: true },
+      { key: "colorVariant", label: "Color", type: "select", options: colors, required: true },
+      { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
+    ];
+  }
+  if (c === TRIMMER_CATEGORY) {
+    return [
+      { key: "brand", label: "Brand", type: "text", required: true },
+      { key: "modelNumber", label: "Model", type: "text", required: true },
+      { key: "currentStock", label: "Quantity", type: "number", required: true },
+      { key: "colorVariant", label: "Variant", type: "select", options: TRIMMER_VARIANTS, required: true },
+      { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
+    ];
+  }
+  if (c === CALCULATOR_CATEGORY || c === TORCH_CATEGORY) {
+    return [
+      { key: "brand", label: "Brand", type: "text", required: true },
+      { key: "modelNumber", label: "Model", type: "text", required: true },
+      { key: "currentStock", label: "Quantity", type: "number", required: true },
+      { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
+    ];
+  }
+  if (isBatteryCategory(c)) {
+    return [
+      { key: "brand", label: "Company", type: "text", required: true },
+      { key: "batteryType", label: "Battery number", type: "text", required: true, placeholder: "e.g. CR2032" },
+      { key: "currentStock", label: "Quantity", type: "number", required: true },
+      { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
+    ];
+  }
+  if (c === ACCESSORY_CATEGORY) {
+    return [
+      { key: "accessoryType", label: "Accessory type", type: "select", options: ACCESSORY_TYPES, required: true },
+      { key: "brand", label: "Brand", type: "text", required: true },
+      { key: "currentStock", label: "Quantity", type: "number", required: true },
+      { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true },
+      { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true }
     ];
   }
   return [
     { key: "brand", label: "Brand", type: "text", required: true },
-    { key: "modelNumber", label: "Model / description", type: "text" },
+    { key: "modelNumber", label: "Model", type: "text" },
     { key: "currentStock", label: "Quantity", type: "number", required: true },
-    { key: "purchasePrice", label: "Purchase price (each) ₹", type: "number", required: true }
+    { key: "purchasePrice", label: "Cost price ₹", type: "number", adminOnly: true }
   ];
 }
 
-export function getOrderFieldDefs(category: string): FieldDef[] {
-  return getInventoryFieldDefs(category)
-    .filter((f) => f.key !== "purchasePrice")
-    .map((f) => {
-      if (f.key === "currentStock") return { ...f, key: "quantity" as const, label: "Order quantity" };
-      if (f.key === "colorVariant") return { ...f, label: "Color", type: "select" as const, options: PRODUCT_COLOR_OPTIONS };
-      return f;
-    });
+export function getOrderFieldDefs(category: string, colorOptions: readonly string[] = []): FieldDef[] {
+  return getInventoryFieldDefs(category, colorOptions)
+    .filter((f) => f.key !== "purchasePrice" && f.key !== "mrp" && f.key !== "sellingPrice")
+    .map((f) => (f.key === "currentStock" ? { ...f, key: "quantity" as const, label: "Quantity" } : f));
 }
 
 export function emptyProduct(category: ProductCategory = "Wall Clocks"): ProductFormValues {
@@ -135,6 +163,7 @@ export function emptyProduct(category: ProductCategory = "Wall Clocks"): Product
     colorVariant: "",
     purchasePrice: 0,
     sellingPrice: 0,
+    mrp: 0,
     currentStock: 0,
     minimumStock: 5,
     batteryType: "",
@@ -166,8 +195,9 @@ export function productFromInventory(item: {
   brand: string;
   modelNumber: string;
   colorVariant: string;
-  purchasePrice: number;
+  purchasePrice?: number;
   sellingPrice: number;
+  mrp?: number;
   currentStock: number;
   minimumStock: number;
   batteryType: string;
@@ -181,8 +211,9 @@ export function productFromInventory(item: {
     brand: item.brand,
     modelNumber: item.modelNumber,
     colorVariant: item.colorVariant,
-    purchasePrice: item.purchasePrice,
+    purchasePrice: item.purchasePrice ?? 0,
     sellingPrice: item.sellingPrice,
+    mrp: item.mrp ?? item.sellingPrice,
     currentStock: item.currentStock,
     minimumStock: item.minimumStock,
     batteryType: item.batteryType || "",
@@ -193,16 +224,6 @@ export function productFromInventory(item: {
   };
 }
 
-function normalizeColorForSelect(color: string): string {
-  const t = color.trim();
-  if (!t) return "";
-  const parts = t.split(/[|/]/).map((p) => p.trim()).filter(Boolean);
-  if (parts.length === 1) return parts[0];
-  const joined = parts.join(" / ");
-  const match = PRODUCT_COLOR_OPTIONS.find((c) => joined.toLowerCase().includes(c.toLowerCase()));
-  return match || joined;
-}
-
 export function orderLineFromProduct(item: {
   category: ProductCategory;
   brand: string;
@@ -210,9 +231,7 @@ export function orderLineFromProduct(item: {
   colorVariant: string;
   batteryType: string;
   accessoryType?: string;
-  strapType?: string;
-  watchDisplay?: string;
-  purchasePrice: number;
+  purchasePrice?: number;
   currentStock: number;
   minimumStock: number;
 }): OrderLineValues {
@@ -220,38 +239,39 @@ export function orderLineFromProduct(item: {
     category: item.category,
     brand: item.brand,
     modelNumber: item.modelNumber,
-    colorVariant: normalizeColorForSelect(item.colorVariant),
+    colorVariant: item.colorVariant,
     batteryType: item.batteryType,
     accessoryType: item.accessoryType || "",
-    accessoryName: item.category === ACCESSORY_CATEGORY ? item.modelNumber : "",
-    strapType: item.strapType || "",
-    watchDisplay: item.watchDisplay || "",
+    accessoryName: "",
+    strapType: "",
+    watchDisplay: "",
     quantity: Math.max(1, item.minimumStock * 2 - item.currentStock),
-    purchasePrice: item.purchasePrice
+    purchasePrice: item.purchasePrice ?? 0
   };
 }
 
 function fieldValue(values: ProductFormValues | OrderLineValues, key: FieldKey): string | number {
-  if (key === "accessoryName") return "accessoryName" in values ? values.accessoryName : values.modelNumber;
   if (key === "quantity") return "quantity" in values ? values.quantity : 0;
-  if (key === "currentStock") return "currentStock" in values ? values.currentStock : ("quantity" in values ? values.quantity : 0);
-  if (key === "purchasePrice") return values.purchasePrice;
+  if (key === "currentStock") return "currentStock" in values ? values.currentStock : 0;
+  if (key === "purchasePrice") return values.purchasePrice ?? 0;
+  if (key === "sellingPrice") return "sellingPrice" in values ? values.sellingPrice : 0;
+  if (key === "mrp") return "mrp" in values ? values.mrp : 0;
   return (values as Record<string, string | number>)[key] ?? "";
 }
 
 export function validateInventoryForm(values: ProductFormValues): string | null {
   for (const field of getInventoryFieldDefs(values.category)) {
-    if (!field.required) continue;
+    if (field.adminOnly || !field.required) continue;
     const v = fieldValue(values, field.key);
-    if (v === "") return `${field.label} is required`;
-    if (field.type === "number") {
-      const num = Number(v);
-      if (field.key === "purchasePrice" || field.key === "currentStock") {
-        if (num < 0) return `${field.label} cannot be negative`;
-      } else if (num <= 0) {
-        return `${field.label} is required`;
-      }
+    if (field.type === "multiColor") {
+      if (!parseColorsFromVariant(String(v)).length) return `${field.label} is required`;
+      continue;
     }
+    if (v === "" || (field.type === "number" && Number(v) < 0)) return `${field.label} is required`;
+  }
+  if (normalizeCategory(values.category) === WALL_CLOCK_CATEGORY) {
+    if (values.mrp <= 0) return "MRP is required";
+    if (values.sellingPrice <= 0) return "Selling price is required";
   }
   return null;
 }
@@ -260,50 +280,63 @@ export function validateOrderLine(values: OrderLineValues): string | null {
   for (const field of getOrderFieldDefs(values.category)) {
     if (!field.required) continue;
     const v = fieldValue(values, field.key);
+    if (field.type === "multiColor" && !parseColorsFromVariant(String(v)).length) return `${field.label} is required`;
     if (v === "") return `${field.label} is required`;
-    if (field.type === "number" && field.key === "quantity" && Number(v) <= 0) {
-      return `${field.label} must be at least 1`;
-    }
+    if (field.type === "number" && field.key === "quantity" && Number(v) <= 0) return "Quantity must be at least 1";
   }
   return null;
 }
 
 export function toInventoryPayload(values: ProductFormValues) {
+  const c = normalizeCategory(values.category);
   return {
     ...values,
-    sellingPrice: values.sellingPrice || values.purchasePrice,
-    colorVariant: isStandardCategory(values.category) ? values.colorVariant : "",
-    batteryType: values.category === BATTERY_CATEGORY ? values.batteryType : "",
-    accessoryType: values.category === ACCESSORY_CATEGORY ? values.accessoryType : "",
-    strapType: values.category === WATCH_CATEGORY ? values.strapType : "",
-    watchDisplay: values.category === WATCH_CATEGORY ? values.watchDisplay : "",
-    modelNumber:
-      values.category === ACCESSORY_CATEGORY || isStandardCategory(values.category) || values.category === "Repair Parts"
-        ? values.modelNumber
-        : ""
+    category: c === LEGACY_BATTERY_CATEGORY ? BATTERY_CATEGORY : values.category,
+    sellingPrice:
+      c === WALL_CLOCK_CATEGORY || c === ACCESSORY_CATEGORY ? values.sellingPrice : values.purchasePrice || values.sellingPrice,
+    mrp: c === WALL_CLOCK_CATEGORY ? values.mrp : values.sellingPrice,
+    colorVariant: categoryOmitsColorField(c) ? "" : values.colorVariant,
+    batteryType: isBatteryCategory(c) ? values.batteryType : "",
+    accessoryType: c === ACCESSORY_CATEGORY ? values.accessoryType : "",
+    modelNumber: c === ACCESSORY_CATEGORY ? "" : values.modelNumber
   };
 }
 
 export function productDisplayLabel(item: Partial<ProductFormValues> & { category?: string }) {
-  const c = item.category || "";
-  if (c === BATTERY_CATEGORY) return [item.brand, item.batteryType].filter(Boolean).join(" · ");
-  if (c === ACCESSORY_CATEGORY) return [item.accessoryType, item.modelNumber].filter(Boolean).join(" · ");
-  if (c === WATCH_CATEGORY) return [item.brand, item.strapType, item.watchDisplay].filter(Boolean).join(" · ");
-  if (isStandardCategory(c)) return [item.brand, item.modelNumber, item.colorVariant].filter(Boolean).join(" · ");
-  return [item.brand, item.modelNumber, item.colorVariant].filter(Boolean).join(" · ");
+  const c = normalizeCategory(item.category || "");
+  if (isBatteryCategory(c)) return [item.brand, item.batteryType].filter(Boolean).join(" · ");
+  if (c === ACCESSORY_CATEGORY) return [item.accessoryType, item.brand].filter(Boolean).join(" · ");
+  if (categoryOmitsColorField(c)) return [item.brand, item.modelNumber].filter(Boolean).join(" · ");
+  if (categoryUsesVariant(c) || c === ALARM_CLOCK_CATEGORY || c === WALL_CLOCK_CATEGORY) {
+    return [item.brand, item.modelNumber, item.colorVariant].filter(Boolean).join(" · ");
+  }
+  return [item.brand, item.modelNumber].filter(Boolean).join(" · ");
 }
 
 export function orderLineDisplayLabel(line: OrderLineValues) {
-  return productDisplayLabel({
-    category: line.category,
-    brand: line.brand,
-    modelNumber: line.modelNumber,
-    colorVariant: line.colorVariant,
-    batteryType: line.batteryType,
-    accessoryType: line.accessoryType,
-    strapType: line.strapType,
-    watchDisplay: line.watchDisplay
-  });
+  return productDisplayLabel(line);
+}
+
+export function orderListParts(line: OrderLineValues) {
+  const c = normalizeCategory(line.category);
+  const base = { quantity: line.quantity };
+  switch (c) {
+    case WALL_CLOCK_CATEGORY:
+    case ALARM_CLOCK_CATEGORY:
+      return { ...base, brand: line.brand, model: line.modelNumber, colors: line.colorVariant };
+    case TRIMMER_CATEGORY:
+      return { ...base, brand: line.brand, model: line.modelNumber, variant: line.colorVariant };
+    case CALCULATOR_CATEGORY:
+    case TORCH_CATEGORY:
+      return { ...base, brand: line.brand, model: line.modelNumber };
+    case BATTERY_CATEGORY:
+    case LEGACY_BATTERY_CATEGORY:
+      return { ...base, company: line.brand, batteryNumber: line.batteryType };
+    case ACCESSORY_CATEGORY:
+      return { ...base, accessoryType: line.accessoryType, brand: line.brand };
+    default:
+      return { ...base, brand: line.brand, model: line.modelNumber };
+  }
 }
 
 export function orderLineToPayload(line: OrderLineValues) {
@@ -314,18 +347,13 @@ export function orderLineToPayload(line: OrderLineValues) {
     colorVariant: line.colorVariant,
     batteryType: line.batteryType,
     accessoryType: line.accessoryType,
-    accessoryName: line.modelNumber,
-    strapType: line.strapType,
-    watchDisplay: line.watchDisplay,
     quantity: line.quantity,
     purchasePrice: line.purchasePrice
   };
 }
 
 export function formValuesForFields(values: ProductFormValues | OrderLineValues): Record<string, string | number> {
-  const row: Record<string, string | number> = { ...values };
-  if ("quantity" in values) row.currentStock = values.quantity;
-  return row;
+  return { ...values, currentStock: "quantity" in values ? values.quantity : (values as ProductFormValues).currentStock };
 }
 
 export { PRODUCT_CATEGORIES };

@@ -11,6 +11,7 @@ const inventorySchema = new mongoose.Schema(
     colorVariant: { type: String, default: "", trim: true },
     purchasePrice: { type: Number, required: true, min: 0 },
     sellingPrice: { type: Number, required: true, min: 0 },
+    mrp: { type: Number, default: 0, min: 0 },
     currentStock: { type: Number, default: 0, min: 0 },
     minimumStock: { type: Number, default: 5, min: 0 },
     batteryType: { type: String, default: "" },
@@ -32,9 +33,7 @@ inventorySchema.pre("validate", function () {
     modelNumber: this.modelNumber,
     colorVariant: this.colorVariant,
     batteryType: this.batteryType,
-    accessoryType: this.accessoryType,
-    strapType: this.strapType,
-    watchDisplay: this.watchDisplay
+    accessoryType: this.accessoryType
   });
   this.searchText = buildProductSearchText({
     productId: this.productId || undefined,
@@ -44,6 +43,7 @@ inventorySchema.pre("validate", function () {
     colorVariant: this.colorVariant,
     purchasePrice: this.purchasePrice,
     sellingPrice: this.sellingPrice,
+    mrp: this.mrp,
     currentStock: this.currentStock,
     minimumStock: this.minimumStock,
     batteryType: this.batteryType,

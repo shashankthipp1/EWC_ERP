@@ -35,6 +35,7 @@ import {
   YAxis
 } from "recharts";
 import { api } from "../api/http";
+import { usePermissions } from "../hooks/usePermissions";
 import { ActivityFeed, Button, Card, MetricCard, PageShell, SectionHeader, Skeleton } from "../components/ui";
 import { APP_NAME } from "../constants/branding";
 import { currency, formatDateTime } from "../utils/format";
@@ -165,6 +166,7 @@ function VerdictBanner({ verdict }: { verdict: Analytics["verdict"] }) {
 }
 
 export function Dashboard() {
+  const { canViewCost } = usePermissions();
   const { data, isLoading } = useQuery({
     queryKey: ["analytics"],
     queryFn: async () => (await api.get("/analytics")).data as Analytics,
@@ -217,13 +219,15 @@ export function Dashboard() {
           <MetricCard label="Money received today" value={currency(data.today.moneyIn)} detail={`${data.today.billsCount} bills · ${data.today.repairsCount} repairs`} icon={Wallet} tone="gold" />
           <MetricCard label="Money spent today" value={currency(data.today.moneyOut)} detail="All shop expenses today" icon={ReceiptText} tone="neutral" />
           <MetricCard label="Sales today" value={currency(data.today.salesValue)} detail="Total bill amount" icon={ShoppingBag} tone="brand" />
-          <MetricCard
-            label={data.today.isProfit ? "Profit today" : "Loss today"}
-            value={currency(Math.abs(data.today.profit))}
-            detail={data.today.isProfit ? "Kept after expenses" : "Spent more than earned"}
-            icon={data.today.isProfit ? TrendingUp : TrendingDown}
-            tone={data.today.isProfit ? "success" : "danger"}
-          />
+          {canViewCost && (
+            <MetricCard
+              label={data.today.isProfit ? "Profit today" : "Loss today"}
+              value={currency(Math.abs(data.today.profit))}
+              detail={data.today.isProfit ? "Kept after expenses" : "Spent more than earned"}
+              icon={data.today.isProfit ? TrendingUp : TrendingDown}
+              tone={data.today.isProfit ? "success" : "danger"}
+            />
+          )}
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">

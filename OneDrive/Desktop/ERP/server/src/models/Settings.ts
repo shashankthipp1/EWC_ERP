@@ -1,11 +1,13 @@
 import mongoose from "mongoose";
+import { DEFAULT_PRODUCT_COLORS } from "../utils/categories.js";
 
 const settingsSchema = new mongoose.Schema(
   {
     shopName: { type: String, default: "Sri Eshwar Watch CO" },
     address: { type: String, default: "" },
     phone: { type: String, default: "" },
-    defaultMinimumStock: { type: Number, default: 5 }
+    defaultMinimumStock: { type: Number, default: 5 },
+    productColors: { type: [String], default: () => [...DEFAULT_PRODUCT_COLORS] }
   },
   { timestamps: true }
 );

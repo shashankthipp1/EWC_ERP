@@ -1,14 +1,22 @@
 import { Router } from "express";
-import { protect } from "../middleware/auth.js";
+import { protect, requireRole } from "../middleware/auth.js";
 import { InventoryItem } from "../models/InventoryItem.js";
+import { getShopSettings } from "../models/Settings.js";
 import { PRODUCT_CATEGORIES } from "../utils/categories.js";
 import { parseProductBody, validateProductPayload } from "../utils/productFields.js";
+import { serializeInventoryItem, serializeInventoryList } from "../utils/serializeInventory.js";
 
 const router = Router();
-const SORT_FIELDS = new Set(["currentStock", "sellingPrice", "purchasePrice", "category", "brand", "createdAt"]);
+const SORT_FIELDS = new Set(["currentStock", "sellingPrice", "purchasePrice", "category", "brand", "createdAt", "mrp"]);
+const writeRoles = requireRole("admin", "manager");
 
-router.get("/meta", protect, (_req, res) => {
-  res.json({ categories: PRODUCT_CATEGORIES });
+router.get("/meta", protect, async (_req, res, next) => {
+  try {
+    const settings = await getShopSettings();
+    res.json({ categories: PRODUCT_CATEGORIES, productColors: settings.productColors || [] });
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.get("/", protect, async (req, res, next) => {
@@ -40,7 +48,8 @@ router.get("/", protect, async (req, res, next) => {
           { colorVariant: new RegExp(s, "i") },
           { accessoryType: new RegExp(s, "i") },
           { batteryType: new RegExp(s, "i") },
-          { category: new RegExp(s, "i") }
+          { category: new RegExp(s, "i") },
+          { productId: new RegExp(s, "i") }
         ];
       }
     }
@@ -53,38 +62,41 @@ router.get("/", protect, async (req, res, next) => {
     const skip = (pageNum - 1) * limitNum;
 
     const [items, total] = await Promise.all([
-      InventoryItem.find(filter)
-        .sort({ [sortField]: sortDir })
-        .skip(skip)
-        .limit(limitNum),
+      InventoryItem.find(filter).sort({ [sortField]: sortDir }).skip(skip).limit(limitNum),
       InventoryItem.countDocuments(filter)
     ]);
 
-    res.json({ items, total, page: pageNum, pages: Math.ceil(total / limitNum) });
+    res.json({
+      items: serializeInventoryList(items, req.user?.role),
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum)
+    });
   } catch (err) {
     next(err);
   }
 });
 
-router.get("/low-stock", protect, async (_req, res, next) => {
+router.get("/low-stock", protect, async (req, res, next) => {
   try {
     const items = await InventoryItem.find({ $expr: { $lte: ["$currentStock", "$minimumStock"] } })
       .sort({ currentStock: 1 })
       .limit(50);
-    res.json({ items });
+    res.json({ items: serializeInventoryList(items, req.user?.role) });
   } catch (err) {
     next(err);
   }
 });
 
-router.post("/", protect, async (req, res, next) => {
+router.post("/", protect, writeRoles, async (req, res, next) => {
   try {
+    const settings = await getShopSettings();
     const data = parseProductBody(req.body);
-    const errors = validateProductPayload(data);
+    const errors = validateProductPayload(data, settings.productColors);
     if (errors.length) return res.status(400).json({ message: errors.join(", ") });
 
     const item = await InventoryItem.create({ ...data, createdBy: req.user?.id });
-    res.status(201).json({ item });
+    res.status(201).json({ item: serializeInventoryItem(item, req.user?.role) });
   } catch (err: unknown) {
     if ((err as { code?: number })?.code === 11000) {
       return res.status(409).json({ message: "A product with the same identity already exists" });
@@ -93,10 +105,11 @@ router.post("/", protect, async (req, res, next) => {
   }
 });
 
-router.put("/:id", protect, async (req, res, next) => {
+router.put("/:id", protect, writeRoles, async (req, res, next) => {
   try {
+    const settings = await getShopSettings();
     const data = parseProductBody(req.body);
-    const errors = validateProductPayload(data);
+    const errors = validateProductPayload(data, settings.productColors);
     if (errors.length) return res.status(400).json({ message: errors.join(", ") });
 
     const item = await InventoryItem.findById(req.params.id);
@@ -104,7 +117,7 @@ router.put("/:id", protect, async (req, res, next) => {
 
     Object.assign(item, data);
     await item.save();
-    res.json({ item });
+    res.json({ item: serializeInventoryItem(item, req.user?.role) });
   } catch (err: unknown) {
     if ((err as { code?: number })?.code === 11000) {
       return res.status(409).json({ message: "A product with the same identity already exists" });
@@ -113,7 +126,7 @@ router.put("/:id", protect, async (req, res, next) => {
   }
 });
 
-router.patch("/bulk-stock", protect, async (req, res, next) => {
+router.patch("/bulk-stock", protect, writeRoles, async (req, res, next) => {
   try {
     const updates = (req.body.updates || []) as { id: string; addQuantity: number }[];
     if (!updates.length) return res.status(400).json({ message: "No stock updates provided" });
@@ -122,12 +135,8 @@ router.patch("/bulk-stock", protect, async (req, res, next) => {
     for (const row of updates) {
       const addQty = Number(row.addQuantity);
       if (!row.id || addQty <= 0) continue;
-      const item = await InventoryItem.findByIdAndUpdate(
-        row.id,
-        { $inc: { currentStock: addQty } },
-        { new: true }
-      );
-      if (item) results.push(item);
+      const item = await InventoryItem.findByIdAndUpdate(row.id, { $inc: { currentStock: addQty } }, { new: true });
+      if (item) results.push(serializeInventoryItem(item, req.user?.role));
     }
     res.json({ updated: results.length, items: results });
   } catch (err) {
@@ -135,7 +144,7 @@ router.patch("/bulk-stock", protect, async (req, res, next) => {
   }
 });
 
-router.patch("/:id/stock", protect, async (req, res, next) => {
+router.patch("/:id/stock", protect, writeRoles, async (req, res, next) => {
   try {
     const currentStock = Number(req.body.currentStock);
     if (Number.isNaN(currentStock) || currentStock < 0) {
@@ -145,13 +154,13 @@ router.patch("/:id/stock", protect, async (req, res, next) => {
     if (!item) return res.status(404).json({ message: "Product not found" });
     item.currentStock = currentStock;
     await item.save();
-    res.json({ item });
+    res.json({ item: serializeInventoryItem(item, req.user?.role) });
   } catch (err) {
     next(err);
   }
 });
 
-router.delete("/:id", protect, async (req, res, next) => {
+router.delete("/:id", protect, writeRoles, async (req, res, next) => {
   try {
     const item = await InventoryItem.findByIdAndDelete(req.params.id);
     if (!item) return res.status(404).json({ message: "Product not found" });
