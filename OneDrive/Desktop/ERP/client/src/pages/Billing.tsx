@@ -6,13 +6,20 @@ import { StockBadge } from "../components/ewc/StockBadge";
 import { CategoryBar } from "../components/pos/CategoryBar";
 import { PaymentBar } from "../components/pos/PaymentBar";
 import { Button, Card, Field, PageShell, compactInputClass, inputClass } from "../components/ui";
+import { usePermissions } from "../hooks/usePermissions";
 import { Product } from "../types/product";
 import { downloadInvoicePdf, printInvoice, shareWhatsApp, type InvoiceData } from "../utils/invoice";
 import { currency, productLabel } from "../utils/format";
 
-type CartItem = Product & { saleQty: number; sellingPriceOverride: number };
+type CartItem = Product & {
+  saleQty: number;
+  sellingPriceOverride: number;
+  /** Admin: cost per unit for margin display (does not change inventory) */
+  costOverride: number;
+};
 
 export function Billing() {
+  const { canViewCost } = usePermissions();
   const [items, setItems] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [q, setQ] = useState("");
@@ -37,12 +44,16 @@ export function Billing() {
     return () => window.clearTimeout(t);
   }, [loadProducts]);
 
-  const subtotal = useMemo(
-    () => cart.reduce((sum, item) => sum + (item.sellingPriceOverride || item.sellingPrice) * item.saleQty, 0),
-    [cart]
-  );
+  const lineTotal = (line: CartItem) => line.sellingPriceOverride * line.saleQty;
+  const lineCost = (line: CartItem) => line.costOverride * line.saleQty;
+
+  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + lineTotal(item), 0), [cart]);
   const gstAmount = useMemo(() => subtotal * (gstPercent / 100), [subtotal, gstPercent]);
   const total = useMemo(() => Math.max(0, subtotal + gstAmount - discount), [subtotal, gstAmount, discount]);
+  const cartProfit = useMemo(
+    () => (canViewCost ? cart.reduce((sum, item) => sum + (lineTotal(item) - lineCost(item)), 0) : 0),
+    [cart, canViewCost]
+  );
 
   useEffect(() => {
     if (paymentMethod === "Mixed") setMixed((m) => ({ ...m, cash: total }));
@@ -62,7 +73,15 @@ export function Billing() {
         }
         return old.map((x) => (x._id === item._id ? { ...x, saleQty: x.saleQty + 1 } : x));
       }
-      return [...old, { ...item, saleQty: 1, sellingPriceOverride: item.sellingPrice }];
+      return [
+        ...old,
+        {
+          ...item,
+          saleQty: 1,
+          sellingPriceOverride: item.sellingPrice,
+          costOverride: item.purchasePrice ?? 0
+        }
+      ];
     });
   }
 
@@ -76,6 +95,16 @@ export function Billing() {
         })
         .filter((r) => r.saleQty > 0)
     );
+  }
+
+  function updateLineRate(id: string, rate: number) {
+    if (rate < 0 || Number.isNaN(rate)) return;
+    setCart((rows) => rows.map((r) => (r._id === id ? { ...r, sellingPriceOverride: rate } : r)));
+  }
+
+  function updateLineCost(id: string, cost: number) {
+    if (cost < 0 || Number.isNaN(cost)) return;
+    setCart((rows) => rows.map((r) => (r._id === id ? { ...r, costOverride: cost } : r)));
   }
 
   function removeLine(id: string) {
@@ -113,8 +142,8 @@ export function Billing() {
         items: cart.map((item) => ({
           description: productLabel(item),
           quantity: item.saleQty,
-          sellingPrice: item.sellingPriceOverride || item.sellingPrice,
-          total: (item.sellingPriceOverride || item.sellingPrice) * item.saleQty
+          sellingPrice: item.sellingPriceOverride,
+          total: lineTotal(item)
         })),
         subtotal,
         discount,
@@ -144,11 +173,10 @@ export function Billing() {
     <PageShell className="pb-28 lg:pb-8">
       <div className="mb-4">
         <h1 className="font-display text-2xl font-bold">Billing counter</h1>
-        <p className="text-sm text-muted">Search, pick category, tap product — stock reduces automatically.</p>
+        <p className="text-sm text-muted">Tap products — edit sale rate{canViewCost ? " and cost" : ""} in the bill before charging.</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px]">
-        {/* LEFT — products */}
         <div className="flex min-h-0 flex-col gap-3">
           <div className="flex items-center gap-2 rounded-2xl border border-line bg-panel p-2">
             <Search className="ml-2 shrink-0 text-muted" size={22} />
@@ -184,17 +212,16 @@ export function Billing() {
           </div>
         </div>
 
-        {/* RIGHT — cart */}
         <Card className="flex flex-col lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)]">
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <ReceiptText className="text-brand" size={24} />
             <div>
               <p className="font-bold">Bill summary</p>
-              <p className="text-xs text-muted">{cart.length} items in cart</p>
+              <p className="text-xs text-muted">{cart.length} items — edit rates below</p>
             </div>
           </div>
 
-          <div className="flex-1 space-y-2 overflow-y-auto py-3" style={{ maxHeight: "min(32vh, 240px)" }}>
+          <div className="flex-1 space-y-2 overflow-y-auto py-3" style={{ maxHeight: "min(40vh, 320px)" }}>
             {cart.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted">Cart is empty — tap a product</p>
             ) : (
@@ -206,6 +233,7 @@ export function Billing() {
                       <Trash2 size={16} />
                     </button>
                   </div>
+
                   <div className="mt-2 flex items-center justify-between">
                     <div className="flex items-center gap-0.5 rounded-lg border border-line p-0.5">
                       <button type="button" className="pos-key !min-h-9 !w-9" onClick={() => adjustQty(line._id, -1)}>
@@ -216,16 +244,56 @@ export function Billing() {
                         <Plus size={16} />
                       </button>
                     </div>
-                    <span className="font-bold text-brand">
-                      {currency((line.sellingPriceOverride || line.sellingPrice) * line.saleQty)}
-                    </span>
+                    <span className="font-bold text-brand">{currency(lineTotal(line))}</span>
                   </div>
+
+                  <div className={`mt-2 grid gap-2 ${canViewCost ? "grid-cols-2" : "grid-cols-1"}`}>
+                    <label className="block">
+                      <span className="text-[10px] font-semibold uppercase text-muted">Sale rate ₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        className={`${compactInputClass} mt-0.5 font-semibold`}
+                        value={line.sellingPriceOverride || ""}
+                        onChange={(e) => updateLineRate(line._id, Number(e.target.value) || 0)}
+                      />
+                    </label>
+                    {canViewCost && (
+                      <label className="block">
+                        <span className="text-[10px] font-semibold uppercase text-muted">Cost ₹</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          className={`${compactInputClass} mt-0.5`}
+                          value={line.costOverride || ""}
+                          onChange={(e) => updateLineCost(line._id, Number(e.target.value) || 0)}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  {canViewCost && (
+                    <p className="mt-1 text-[10px] text-muted">
+                      Profit this line:{" "}
+                      <span className={lineTotal(line) - lineCost(line) >= 0 ? "text-success" : "text-danger"}>
+                        {currency(lineTotal(line) - lineCost(line))}
+                      </span>
+                    </p>
+                  )}
                 </div>
               ))
             )}
           </div>
 
           <div className="space-y-3 border-t border-line pt-3">
+            {canViewCost && cart.length > 0 && (
+              <div className="rounded-lg border border-success/20 bg-success/10 px-3 py-2 text-sm">
+                <span className="text-muted">Est. profit on this bill: </span>
+                <span className="font-bold text-success">{currency(cartProfit)}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <Field label="Discount ₹">
                 <input

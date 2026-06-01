@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, IndianRupee, Package, Plus, ScanLine, TrendingUp, XCircle } from "lucide-react";
+import { AlertTriangle, IndianRupee, Package, Plus, ScanLine, TrendingUp, Wallet, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import { QuickAction } from "../components/ewc/QuickActionBar";
@@ -47,8 +47,9 @@ export function EwcDashboard() {
         <p className="mt-1 text-sm text-muted">Tap a big button to start billing or add stock.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <QuickAction to="/billing" icon={ScanLine} label="New bill" primary />
+        <QuickAction to="/finance" icon={Wallet} label="Expenditure" />
         {canManageInventory && <QuickAction to="/inventory" icon={Plus} label="Add product" />}
       </div>
 

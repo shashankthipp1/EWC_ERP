@@ -6,7 +6,8 @@ import {
   ScanLine,
   Settings,
   Truck,
-  UserCog
+  UserCog,
+  Wallet
 } from "lucide-react";
 
 export const navIconMap = {
@@ -15,6 +16,7 @@ export const navIconMap = {
   ScanLine,
   ReceiptText,
   Truck,
+  Wallet,
   BarChart3,
   UserCog,
   Settings

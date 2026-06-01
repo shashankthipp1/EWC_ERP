@@ -12,6 +12,7 @@ export type MainNavIcon =
   | "ScanLine"
   | "ReceiptText"
   | "Truck"
+  | "Wallet"
   | "BarChart3"
   | "UserCog"
   | "Settings";
@@ -31,6 +32,7 @@ export const mainNav: MainNavItem[] = [
   { to: "/billing", label: "Billing", icon: "ScanLine" },
   { to: "/sales", label: "Sales", icon: "ReceiptText" },
   { to: "/orders", label: "Purchases", icon: "Truck" },
+  { to: "/finance", label: "Expenditure", icon: "Wallet" },
   { to: "/reports", label: "Reports", icon: "BarChart3" },
   { to: "/staff", label: "Users", icon: "UserCog", adminOnly: true },
   { to: "/settings", label: "Settings", icon: "Settings" }

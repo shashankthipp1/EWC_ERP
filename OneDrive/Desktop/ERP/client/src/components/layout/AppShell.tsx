@@ -11,6 +11,7 @@ const routeMeta: Record<string, { title: string; subtitle?: string }> = {
   "/billing": { title: "Billing", subtitle: "Tap products to make a bill" },
   "/sales": { title: "Sales", subtitle: "Past bills and invoices" },
   "/orders": { title: "Purchases", subtitle: "Order stock from suppliers" },
+  "/finance": { title: "Expenditure", subtitle: "Record shop expenses and payouts" },
   "/reports": { title: "Reports", subtitle: "Sales and stock reports" },
   "/staff": { title: "Users", subtitle: "Staff accounts" },
   "/settings": { title: "Settings", subtitle: "Shop details" }
