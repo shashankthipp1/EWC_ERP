@@ -406,7 +406,10 @@ export async function buildAnalytics() {
     },
     counts: {
       totalProducts: inventory.length,
-      lowStockCount: inventory.filter((i) => Number(i.currentStock) <= Number(i.minimumStock)).length,
+      outOfStockCount: inventory.filter((i) => Number(i.currentStock) <= 0).length,
+      lowStockCount: inventory.filter(
+        (i) => Number(i.currentStock) > 0 && Number(i.currentStock) <= Number(i.minimumStock)
+      ).length,
       openRepairs,
       inventoryValue: Math.round(inventoryValue)
     },

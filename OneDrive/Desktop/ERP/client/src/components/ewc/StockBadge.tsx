@@ -16,7 +16,7 @@ export function StockBadge({ current, minimum = 5, large }: { current: number; m
         large ? "px-4 py-1.5 text-sm" : "px-3 py-1 text-xs"
       )}
     >
-      {s.label}
+      {s.icon} {s.label}
     </span>
   );
 }

@@ -1,19 +1,10 @@
-import {
-  Boxes,
-  Download,
-  FileSpreadsheet,
-  Plus,
-  Search,
-  LogOut,
-  Settings,
-  SlidersHorizontal
-} from "lucide-react";
+import { AlertTriangle, Boxes, Download, FileSpreadsheet, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { api } from "../api/http";
 import { CategoryFields } from "../components/CategoryFields";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { Column, DataTable } from "../components/DataTable";
+import { InventoryList } from "../components/inventory/InventoryList";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { Button, Card, Field, MetricCard, SectionHeader, inputClass } from "../components/ui";
 import { APP_NAME } from "../constants/branding";
@@ -33,7 +24,6 @@ import {
 } from "../data/productFields";
 import { Product } from "../types/product";
 import { currency, formatDate, productLabel } from "../utils/format";
-import { StockBadge } from "../components/ewc/StockBadge";
 import { exportRowsToExcel, exportRowsToPdf } from "../utils/exporters";
 
 const defaultShop = { shopName: APP_NAME, address: "", phone: "" };
@@ -199,81 +189,20 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
     toast.success(`Exported as ${type.toUpperCase()}`);
   }
 
-  const columns: Column<Product>[] = [
-    { key: "productId", header: "ID", render: (r) => <span className="font-mono text-brand">{r.productId}</span> },
-    { key: "category", header: "Category" },
-    {
-      key: "brand",
-      header: "Product",
-      render: (r) => <p className="font-medium">{productLabel(r)}</p>
-    },
-    {
-      key: "currentStock",
-      header: "Qty",
-      render: (r) =>
-        canManageInventory ? (
-          <input
-            type="number"
-            min={0}
-            className={`w-20 rounded border border-line bg-navyLight/60 px-2 py-1 text-sm ${r.currentStock <= r.minimumStock ? "font-semibold text-danger" : ""}`}
-            defaultValue={r.currentStock}
-            onBlur={(e) => {
-              const next = Number(e.target.value);
-              if (next !== r.currentStock) saveStock(r._id, next);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-            }}
-          />
-        ) : (
-          <span className={r.currentStock <= r.minimumStock ? "font-semibold text-danger" : ""}>{r.currentStock}</span>
-        )
-    },
-    ...(canViewCost
-      ? [{ key: "purchasePrice", header: "Cost", render: (r: Product) => currency(r.purchasePrice ?? 0) } as Column<Product>]
-      : []),
-    {
-      key: "status",
-      header: "Status",
-      render: (r) => <StockBadge current={r.currentStock} minimum={r.minimumStock} large />
-    },
-    {
-      key: "sellingPrice",
-      header: "Sell price",
-      render: (r) => <span className="text-base font-semibold">{currency(r.sellingPrice)}</span>
-    },
-    ...(canManageInventory
-      ? [
-          {
-            key: "actions",
-            header: "Actions",
-            render: (r: Product) => (
-              <div className="flex gap-2">
-                <button type="button" onClick={() => openEdit(r)} className="rounded p-1.5 text-brand hover:bg-brand/10" title="Edit">
-                  <Settings size={16} />
-                </button>
-                <button type="button" onClick={() => setDeleteTarget(r)} className="rounded p-1.5 text-danger hover:bg-danger/10" title="Delete">
-                  <LogOut size={16} />
-                </button>
-              </div>
-            )
-          } as Column<Product>
-        ]
-      : [])
-  ];
-
+  const outOfStockCount = items.filter((i) => i.currentStock <= 0).length;
   const inventoryValue = canViewCost
     ? items.reduce((s, i) => s + (i.purchasePrice ?? 0) * i.currentStock, 0)
     : 0;
-  const lowStockCount = items.filter((i) => i.currentStock <= i.minimumStock).length;
+  const lowStockCount = items.filter((i) => i.currentStock > 0 && i.currentStock <= i.minimumStock).length;
   const inventoryFields = getInventoryFieldDefs(form.category, colors).filter((f) => !f.adminOnly || canViewCost);
 
   return (
     <div className="space-y-5 sm:space-y-6">
       {!embedded && (
         <SectionHeader
-          eyebrow="Stock control"
-          title="Inventory Management"
+          eyebrow="Stock"
+          title="Inventory"
+          subtitle={canManageInventory ? "Add, edit, and track all products" : "View stock and selling prices"}
           action={
             <div className="flex flex-wrap gap-2">
               {canManageInventory && (
@@ -304,12 +233,13 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard label="Products" value={total} detail="Matching current filters" icon={Boxes} />
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+        <MetricCard label="Products" value={total} detail="In list" icon={Boxes} />
+        <MetricCard label="Low stock" value={lowStockCount} detail="🟠 Need reorder" icon={AlertTriangle} tone="gold" />
+        <MetricCard label="Out of stock" value={outOfStockCount} detail="🔴 Cannot sell" icon={AlertTriangle} tone="danger" />
         {canViewCost && (
-          <MetricCard label="Stock value (cost)" value={currency(inventoryValue)} detail="Cost × qty on this page" icon={Boxes} tone="brand" />
+          <MetricCard label="Page value" value={currency(inventoryValue)} detail="Cost on this page" icon={Boxes} tone="brand" />
         )}
-        <MetricCard label="Low Stock" value={lowStockCount} detail="At or below minimum level" icon={Boxes} tone="danger" />
       </div>
 
       {showForm && canManageInventory && (
@@ -412,7 +342,33 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
           <input type="checkbox" checked={filter.lowStock} onChange={(e) => { setFilter({ ...filter, lowStock: e.target.checked }); setPage(1); }} />
           Show low stock only
         </label>
-        {loading ? <LoadingSpinner /> : <DataTable columns={columns} rows={items} rowKey={(r) => r._id} page={page} pages={pages} onPageChange={setPage} />}
+        {loading ? (
+          <LoadingSpinner />
+        ) : (
+          <>
+            <InventoryList
+              items={items}
+              canViewCost={canViewCost}
+              canManage={canManageInventory}
+              onEdit={openEdit}
+              onDelete={setDeleteTarget}
+              onStockChange={saveStock}
+            />
+            {pages > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                  Previous
+                </Button>
+                <span className="text-sm text-muted">
+                  Page {page} of {pages}
+                </span>
+                <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       </Card>
 
       <ConfirmDialog

@@ -1,10 +1,10 @@
-import { Download, Printer, ReceiptText, Search, Share2, Trash2 } from "lucide-react";
+import { Download, MessageCircle, Printer, Search, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { api } from "../api/http";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Badge, Button, Card, PageShell, inputClass } from "../components/ui";
-import { downloadInvoicePdf, printInvoice, shareInvoice, type InvoiceData } from "../utils/invoice";
+import { downloadInvoicePdf, printInvoice, shareWhatsApp, type InvoiceData } from "../utils/invoice";
 import { currency, formatDateTime } from "../utils/format";
 
 type SaleRecord = {
@@ -134,8 +134,13 @@ export function Sales() {
                 <Button variant="secondary" size="sm" className="min-h-[44px]" onClick={() => downloadInvoicePdf(toInvoice(sale))}>
                   <Download size={18} /> PDF
                 </Button>
-                <Button variant="secondary" size="sm" className="min-h-[44px]" onClick={() => shareInvoice(toInvoice(sale)).catch(() => toast.error("Share not supported"))}>
-                  <Share2 size={18} /> Share
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="min-h-[44px] !text-success"
+                  onClick={() => shareWhatsApp(toInvoice(sale), sale.customerSnapshot?.phone)}
+                >
+                  <MessageCircle size={18} /> WhatsApp
                 </Button>
                 <Button variant="ghost" size="sm" className="min-h-[44px] !text-danger" onClick={() => setDeleteTarget(sale)}>
                   <Trash2 size={18} /> Remove

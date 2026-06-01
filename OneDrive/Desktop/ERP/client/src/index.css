@@ -133,6 +133,14 @@ textarea {
     padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
   }
 
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
   @media (min-width: 1024px) {
     .main-content {
       padding-bottom: 2rem;
