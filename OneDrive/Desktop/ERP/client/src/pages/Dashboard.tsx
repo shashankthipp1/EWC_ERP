@@ -35,11 +35,11 @@ import {
   YAxis
 } from "recharts";
 import { api } from "../api/http";
-import { Button, Card, MetricCard, PageShell, SectionHeader, Skeleton } from "../components/ui";
+import { ActivityFeed, Button, Card, MetricCard, PageShell, SectionHeader, Skeleton } from "../components/ui";
 import { APP_NAME } from "../constants/branding";
 import { currency, formatDateTime } from "../utils/format";
 
-const CHART_COLORS = ["#c9a227", "#00d1b2", "#8b7cf6", "#38bdf8", "#e74c3c", "#a3e635", "#f472b6", "#fb923c"];
+const CHART_COLORS = ["#2dd4bf", "#6366f1", "#8b7cf6", "#38bdf8", "#f87171", "#34d399", "#f472b6", "#fbbf24"];
 
 const tooltipStyle = { background: "#1a2d4a", border: "1px solid #2d4a6f", borderRadius: 8, fontSize: 12 };
 
@@ -192,13 +192,21 @@ export function Dashboard() {
   return (
     <PageShell>
       <div className="space-y-8">
-        <SectionHeader
-          eyebrow={data.shop?.name || APP_NAME}
-          title="Shop Insights & Analytics"
-          subtitle="Easy summary on top, advanced graphs below — all live from your sales, repairs, stock, and expenses."
-        />
-
-        <VerdictBanner verdict={data.verdict} />
+        <div className="grid gap-6 xl:grid-cols-[1fr_minmax(280px,360px)]">
+          <div className="space-y-6">
+            <SectionHeader
+              eyebrow={data.shop?.name || APP_NAME}
+              title="Venue command center"
+              subtitle="Real-time revenue, inventory risk, and operational KPIs across locations."
+            />
+            <VerdictBanner verdict={data.verdict} />
+          </div>
+          <Card className="h-fit xl:sticky xl:top-24">
+            <h3 className="mb-1 font-display text-sm font-bold uppercase tracking-wider text-muted">Live activity</h3>
+            <p className="mb-4 text-xs text-muted">Alerts & operational feed</p>
+            <ActivityFeed />
+          </Card>
+        </div>
 
         <Card className="border-gold/20 bg-gold/5">
           <p className="text-sm font-medium text-gold">Today in one line</p>

@@ -1,40 +1,59 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  darkMode: ["class", '[data-theme="dark"]'],
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "Segoe UI", "system-ui", "sans-serif"],
-        display: ["Inter", "Segoe UI", "system-ui", "sans-serif"]
+        sans: ["DM Sans", "Inter", "system-ui", "sans-serif"],
+        display: ["Plus Jakarta Sans", "DM Sans", "sans-serif"]
       },
       colors: {
-        navy: "#050a12",
-        navyLight: "#0b1220",
-        panel: "#111827",
-        panel2: "#1a2332",
-        line: "rgba(148, 163, 184, 0.14)",
-        gold: "#c9a227",
-        goldLight: "#e4c76b",
-        cream: "#f8fafc",
-        muted: "#94a3b8",
-        accent: "#3b82f6",
-        accentSoft: "rgba(59, 130, 246, 0.12)",
-        danger: "#ef4444",
-        success: "#10b981"
+        navy: "var(--bg-base)",
+        navyLight: "var(--bg-elevated)",
+        panel: "var(--bg-surface)",
+        panel2: "var(--bg-surface-2)",
+        line: "var(--border-default)",
+        gold: "var(--brand)",
+        goldLight: "var(--brand-bright)",
+        cream: "var(--text-primary)",
+        muted: "var(--text-muted)",
+        accent: "var(--accent)",
+        accentSoft: "var(--accent-soft)",
+        danger: "var(--danger)",
+        success: "var(--success)",
+        warning: "var(--warning)",
+        surface: "var(--bg-surface)",
+        "surface-2": "var(--bg-surface-2)",
+        border: "var(--border-default)",
+        brand: "var(--brand)",
+        "brand-bright": "var(--brand-bright)"
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(201, 162, 39, 0.2), 0 20px 50px -12px rgba(201, 162, 39, 0.25)",
-        card: "0 1px 0 rgba(255,255,255,0.06) inset, 0 24px 48px -24px rgba(0, 0, 0, 0.65)",
-        panel: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-        soft: "0 4px 24px rgba(0, 0, 0, 0.35)"
+        glow: "var(--shadow-glow)",
+        card: "var(--shadow-card)",
+        panel: "var(--shadow-panel)",
+        soft: "var(--shadow-soft)",
+        lift: "0 12px 40px -12px var(--shadow-color)"
       },
       borderRadius: {
-        xl: "1rem",
-        "2xl": "1.25rem",
-        "3xl": "1.5rem"
+        xl: "0.875rem",
+        "2xl": "1rem",
+        "3xl": "1.25rem"
       },
       backgroundImage: {
-        mesh: "radial-gradient(at 20% 0%, rgba(59,130,246,0.15) 0, transparent 50%), radial-gradient(at 80% 10%, rgba(201,162,39,0.12) 0, transparent 45%), radial-gradient(at 50% 100%, rgba(15,23,42,0.8) 0, transparent 60%)"
+        mesh: "var(--bg-mesh)",
+        "gradient-brand": "linear-gradient(135deg, var(--brand) 0%, var(--brand-bright) 100%)"
+      },
+      animation: {
+        "fade-in": "fadeIn 0.35s ease-out",
+        "slide-up": "slideUp 0.4s ease-out",
+        shimmer: "shimmer 1.5s infinite"
+      },
+      keyframes: {
+        fadeIn: { from: { opacity: "0" }, to: { opacity: "1" } },
+        slideUp: { from: { opacity: "0", transform: "translateY(8px)" }, to: { opacity: "1", transform: "translateY(0)" } },
+        shimmer: { "0%": { backgroundPosition: "200% 0" }, "100%": { backgroundPosition: "-200% 0" } }
       }
     }
   },

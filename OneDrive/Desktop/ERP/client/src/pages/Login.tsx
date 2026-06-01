@@ -1,16 +1,18 @@
-import { Boxes, ClipboardList, Clock, KeyRound, LogIn, ShieldCheck, UserPlus } from "lucide-react";
+import { Boxes, ClipboardList, KeyRound, LogIn, Moon, ShieldCheck, Sparkles, Sun, UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
 import toast from "react-hot-toast";
 import { Navigate } from "react-router-dom";
 import { APP_NAME, APP_TAGLINE } from "../constants/branding";
 import { DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD } from "../constants/adminCredentials";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { Badge, Button, Card, Field, inputClass } from "../components/ui";
 
 type Mode = "login" | "signup" | "forgot" | "otp";
 
 export function Login() {
   const { token, login, signup, forgotPassword, verifyOtp } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState<Mode>("login");
   const [form, setForm] = useState({ name: "", email: DEMO_ADMIN_EMAIL, password: DEMO_ADMIN_PASSWORD, otp: "" });
 
@@ -44,6 +46,15 @@ export function Login() {
 
   return (
     <main className="relative min-h-screen overflow-hidden">
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className="absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-xl border border-line bg-panel/90 text-cream shadow-soft"
+        style={{ top: "max(1rem, env(safe-area-inset-top))" }}
+        aria-label="Toggle theme"
+      >
+        {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
       <div className="pointer-events-none absolute inset-0 bg-mesh" />
       <div className="pointer-events-none absolute -left-32 top-20 h-96 w-96 rounded-full bg-accent/10 blur-3xl" />
       <div className="pointer-events-none absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-gold/10 blur-3xl" />
@@ -53,8 +64,8 @@ export function Login() {
           <Badge tone="accent">
             <ShieldCheck size={12} className="mr-1 inline" /> {APP_NAME}
           </Badge>
-          <h1 className="mt-3 text-2xl font-bold leading-tight text-cream">Enterprise operations on any device</h1>
-          <p className="mt-2 text-sm text-muted">Inventory, sales, orders, and finance — optimized for phone and tablet.</p>
+          <h1 className="mt-3 font-display text-2xl font-bold leading-tight text-cream">Restaurant · hotel · retail POS</h1>
+          <p className="mt-2 text-sm text-muted">Inventory, checkout, procurement, and analytics — built for multi-venue operators.</p>
         </section>
 
         <section className="hidden flex-col justify-between lg:flex">
@@ -63,11 +74,11 @@ export function Login() {
               <ShieldCheck size={12} className="mr-1 inline" /> Enterprise-grade security
             </Badge>
             <h1 className="mt-8 max-w-xl font-display text-5xl font-bold leading-[1.1] tracking-tight text-cream">
-              Operations at scale. One intelligent platform.
+              Run every venue like a flagship property.
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-muted">
-              {APP_NAME} unifies inventory, sales, procurement, finance, and service workflows for modern retail and
-              distribution teams.
+              {APP_NAME} delivers Toast-class POS speed with enterprise inventory, purchase orders, and real-time command
+              center analytics for restaurants, hotels, malls, and retail chains.
             </p>
           </div>
 
@@ -92,8 +103,8 @@ export function Login() {
         <div className="w-full">
           <Card className="border-white/[0.08] shadow-panel">
             <div className="mb-6 flex items-center gap-3 sm:mb-8 sm:gap-4">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-gold to-goldLight text-navy shadow-glow sm:h-14 sm:w-14">
-                <Clock size={24} />
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-brand text-navy shadow-glow sm:h-14 sm:w-14">
+                <Sparkles size={24} />
               </div>
               <div className="min-w-0">
                 <h2 className="text-xl font-bold tracking-tight text-cream sm:text-2xl">{APP_NAME}</h2>

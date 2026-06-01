@@ -5,7 +5,7 @@ import { Billing } from "./pages/Billing";
 import { Customers } from "./pages/Customers";
 import { Dashboard } from "./pages/Dashboard";
 import { Finance } from "./pages/Finance";
-import { Inventory } from "./pages/Inventory";
+import { InventoryHub } from "./pages/InventoryHub";
 import { Login } from "./pages/Login";
 import { Orders } from "./pages/Orders";
 import { Repairs } from "./pages/Repairs";
@@ -22,7 +22,7 @@ export function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
             <Route index element={<Dashboard />} />
-            <Route path="inventory" element={<Inventory />} />
+            <Route path="inventory" element={<InventoryHub />} />
             <Route path="billing" element={<Billing />} />
             <Route path="orders" element={<Orders />} />
             <Route path="repairs" element={<Repairs />} />

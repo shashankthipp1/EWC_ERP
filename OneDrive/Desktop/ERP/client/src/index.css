@@ -1,72 +1,134 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* —— Light theme (enterprise SaaS) —— */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-base: #f4f6f9;
+  --bg-elevated: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-surface-2: #f8fafc;
+  --border-default: rgba(15, 23, 42, 0.1);
+  --text-primary: #0f172a;
+  --text-muted: #64748b;
+  --brand: #0d9488;
+  --brand-bright: #14b8a6;
+  --accent: #6366f1;
+  --accent-soft: rgba(99, 102, 241, 0.12);
+  --danger: #dc2626;
+  --success: #059669;
+  --warning: #d97706;
+  --shadow-color: rgba(15, 23, 42, 0.12);
+  --shadow-glow: 0 0 0 1px rgba(13, 148, 136, 0.2), 0 16px 40px -12px rgba(13, 148, 136, 0.25);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+  --shadow-panel: 0 24px 48px -16px rgba(15, 23, 42, 0.15);
+  --shadow-soft: 0 4px 16px rgba(15, 23, 42, 0.08);
+  --bg-mesh: radial-gradient(at 0% 0%, rgba(13, 148, 136, 0.08) 0, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.06) 0, transparent 45%),
+    linear-gradient(180deg, #f4f6f9 0%, #eef2f7 100%);
+  --sidebar-bg: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  --sidebar-text: #f1f5f9;
+  --sidebar-muted: #94a3b8;
+}
+
+/* —— Dark theme (premium POS night mode) —— */
+[data-theme="dark"] {
   color-scheme: dark;
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  -webkit-font-smoothing: antialiased;
+  --bg-base: #06090f;
+  --bg-elevated: #0c1220;
+  --bg-surface: #111827;
+  --bg-surface-2: #1a2332;
+  --border-default: rgba(148, 163, 184, 0.12);
+  --text-primary: #f8fafc;
+  --text-muted: #94a3b8;
+  --brand: #2dd4bf;
+  --brand-bright: #5eead4;
+  --accent: #818cf8;
+  --accent-soft: rgba(129, 140, 248, 0.15);
+  --danger: #f87171;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --shadow-color: rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 0 1px rgba(45, 212, 191, 0.25), 0 20px 50px -12px rgba(45, 212, 191, 0.2);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 24px 48px -24px rgba(0, 0, 0, 0.65);
+  --shadow-panel: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
+  --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.35);
+  --bg-mesh: radial-gradient(at 20% 0%, rgba(45, 212, 191, 0.12) 0, transparent 50%),
+    radial-gradient(at 80% 10%, rgba(129, 140, 248, 0.1) 0, transparent 45%),
+    linear-gradient(180deg, #06090f 0%, #0a1018 100%);
+  --sidebar-bg: linear-gradient(180deg, #0a0f18 0%, #0f172a 100%);
+  --sidebar-text: #f8fafc;
+  --sidebar-muted: #94a3b8;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #050a12;
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.18), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(201, 162, 39, 0.08), transparent),
-    linear-gradient(180deg, #050a12 0%, #0a1018 50%, #060b12 100%);
-  color: #f8fafc;
+  font-family: "DM Sans", Inter, system-ui, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg-base);
+  background-image: var(--bg-mesh);
+  color: var(--text-primary);
   overflow-x: hidden;
 }
 
 input,
 select,
 textarea {
-  color-scheme: dark;
+  color-scheme: inherit;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
-}
-
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-*::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
-  border-radius: 999px;
+  scrollbar-color: var(--border-default) transparent;
 }
 
 @layer components {
   .glass-panel {
-    @apply border border-white/[0.06] bg-panel/80 shadow-card backdrop-blur-xl;
+    @apply border border-line bg-panel/90 shadow-card backdrop-blur-xl;
   }
 
   .enterprise-card {
-    @apply rounded-2xl border border-white/[0.06] bg-gradient-to-b from-panel2/90 to-panel/90 shadow-card backdrop-blur-xl;
+    @apply rounded-2xl border border-line shadow-card backdrop-blur-sm;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--bg-surface-2) 95%, transparent), color-mix(in srgb, var(--bg-surface) 95%, transparent));
   }
 
   .nav-item-active {
-    @apply bg-gradient-to-r from-gold/90 to-goldLight/90 font-semibold text-navy shadow-glow;
+    @apply bg-gradient-to-r from-brand to-brand-bright font-semibold text-navy shadow-glow;
+  }
+
+  [data-theme="light"] .nav-item-active {
+    @apply text-white;
   }
 
   .nav-item-idle {
-    @apply text-cream/70 transition hover:bg-white/[0.04] hover:text-cream;
+    @apply text-sidebar-muted transition hover:bg-white/[0.06] hover:text-sidebar-text;
+  }
+
+  .sidebar-shell {
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+  }
+
+  .text-sidebar-muted {
+    color: var(--sidebar-muted);
+  }
+
+  .text-sidebar-text {
+    color: var(--sidebar-text);
   }
 
   .page-shell {
-    @apply mx-auto w-full max-w-[1600px];
+    @apply mx-auto w-full max-w-[1680px] animate-fade-in;
   }
 
   .main-content {
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
   }
 
   @media (min-width: 1024px) {
@@ -75,16 +137,36 @@ textarea {
     }
   }
 
-  .touch-target {
-    @apply min-h-[44px] min-w-[44px];
+  .pos-key {
+    @apply flex min-h-[52px] items-center justify-center rounded-xl border border-line bg-surface-2 text-lg font-semibold transition active:scale-[0.97];
   }
 
-  .mobile-scroll-x {
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+  .pos-key:hover {
+    border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+    background: color-mix(in srgb, var(--brand) 8%, var(--bg-surface-2));
   }
 
-  .mobile-scroll-x::-webkit-scrollbar {
-    display: none;
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--bg-surface-2) 0%,
+      var(--bg-elevated) 50%,
+      var(--bg-surface-2) 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+
+  .data-grid-row {
+    @apply border-t transition;
+    border-color: color-mix(in srgb, var(--border-default) 60%, transparent);
+  }
+
+  .data-grid-row:hover {
+    background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  }
+
+  [data-theme="light"] .data-grid-row:hover {
+    background: rgb(248 250 252);
   }
 }

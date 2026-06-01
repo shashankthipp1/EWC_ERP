@@ -35,7 +35,7 @@ import { exportRowsToExcel, exportRowsToPdf } from "../utils/exporters";
 
 const defaultShop = { shopName: APP_NAME, address: "", phone: "" };
 
-export function Inventory() {
+export function Inventory({ embedded = false }: { embedded?: boolean }) {
   const [items, setItems] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -245,23 +245,35 @@ export function Inventory() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <SectionHeader
-        eyebrow="Stock control"
-        title="Inventory Management"
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="ghost" onClick={() => exportData("excel")}>
-              <FileSpreadsheet size={16} /> Excel
-            </Button>
-            <Button variant="ghost" onClick={() => exportData("pdf")}>
-              <Download size={16} /> PDF
-            </Button>
-            <Button onClick={openCreate}>
-              <Plus size={16} /> Add Product
-            </Button>
-          </div>
-        }
-      />
+      {!embedded && (
+        <SectionHeader
+          eyebrow="Stock control"
+          title="Inventory Management"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <Button variant="ghost" onClick={() => exportData("excel")}>
+                <FileSpreadsheet size={16} /> Excel
+              </Button>
+              <Button variant="ghost" onClick={() => exportData("pdf")}>
+                <Download size={16} /> PDF
+              </Button>
+              <Button onClick={openCreate}>
+                <Plus size={16} /> Add Product
+              </Button>
+            </div>
+          }
+        />
+      )}
+      {embedded && (
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => exportData("excel")}>
+            <FileSpreadsheet size={16} /> Excel
+          </Button>
+          <Button size="sm" onClick={openCreate}>
+            <Plus size={16} /> Add product
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard label="Products" value={total} detail="Matching current filters" icon={Boxes} />

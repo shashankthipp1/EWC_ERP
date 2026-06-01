@@ -1,12 +1,13 @@
 import { ReactNode } from "react";
 import { Button } from "./ui";
+import { EmptyState } from "./ui/EmptyState";
+import { Inbox } from "lucide-react";
 
 export type Column<T> = {
   key: string;
   header: string;
   render?: (row: T) => ReactNode;
   className?: string;
-  /** Hide on mobile card view (e.g. actions column still shown) */
   hideOnMobile?: boolean;
   mobileLabel?: string;
 };
@@ -19,33 +20,47 @@ type Props<T> = {
   pages: number;
   onPageChange: (page: number) => void;
   emptyMessage?: string;
+  loading?: boolean;
 };
 
-export function DataTable<T>({ columns, rows, rowKey, page, pages, onPageChange, emptyMessage = "No records found" }: Props<T>) {
+export function DataTable<T>({
+  columns,
+  rows,
+  rowKey,
+  page,
+  pages,
+  onPageChange,
+  emptyMessage = "No records found",
+  loading = false
+}: Props<T>) {
   const mobileColumns = columns.filter((c) => !c.hideOnMobile);
   const actionColumn = columns.find((c) => c.key === "actions");
 
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="skeleton-shimmer h-14 rounded-xl border border-line" />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div>
-      {/* Mobile: card list */}
       <div className="space-y-3 md:hidden">
         {rows.length === 0 ? (
-          <p className="rounded-2xl border border-white/[0.08] bg-navyLight/40 px-4 py-12 text-center text-sm text-muted">
-            {emptyMessage}
-          </p>
+          <EmptyState icon={Inbox} title={emptyMessage} />
         ) : (
           rows.map((row) => (
-            <article
-              key={rowKey(row)}
-              className="rounded-2xl border border-white/[0.08] bg-navyLight/50 p-4 shadow-soft"
-            >
+            <article key={rowKey(row)} className="rounded-2xl border border-line bg-panel/80 p-4 shadow-soft">
               <dl className="space-y-2.5">
                 {mobileColumns.map((col) => {
                   const value = col.render ? col.render(row) : (row as Record<string, unknown>)[col.key] as ReactNode;
                   if (col.key === "actions") return null;
                   return (
                     <div key={col.key} className="flex items-start justify-between gap-3 text-sm">
-                      <dt className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted">
+                      <dt className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted">
                         {col.mobileLabel || col.header}
                       </dt>
                       <dd className="min-w-0 text-right font-medium text-cream">{value}</dd>
@@ -54,19 +69,18 @@ export function DataTable<T>({ columns, rows, rowKey, page, pages, onPageChange,
                 })}
               </dl>
               {actionColumn?.render && (
-                <div className="mt-4 flex justify-end border-t border-white/[0.06] pt-3">{actionColumn.render(row)}</div>
+                <div className="mt-4 flex justify-end border-t border-line pt-3">{actionColumn.render(row)}</div>
               )}
             </article>
           ))
         )}
       </div>
 
-      {/* Desktop: table */}
-      <div className="hidden overflow-hidden rounded-2xl border border-white/[0.08] bg-navyLight/40 md:block">
+      <div className="hidden overflow-hidden rounded-2xl border border-line bg-panel/60 shadow-soft md:block">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-white/[0.06] bg-white/[0.03]">
+              <tr className="border-b border-line bg-surface-2/90">
                 {columns.map((col) => (
                   <th key={col.key} className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-muted">
                     {col.header}
@@ -77,16 +91,13 @@ export function DataTable<T>({ columns, rows, rowKey, page, pages, onPageChange,
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-5 py-16 text-center text-muted">
-                    {emptyMessage}
+                  <td colSpan={columns.length} className="px-5 py-12">
+                    <EmptyState icon={Inbox} title={emptyMessage} />
                   </td>
                 </tr>
               ) : (
-                rows.map((row, idx) => (
-                  <tr
-                    key={rowKey(row)}
-                    className={`border-t border-white/[0.04] transition hover:bg-white/[0.03] ${idx % 2 === 0 ? "" : "bg-white/[0.015]"}`}
-                  >
+                rows.map((row) => (
+                  <tr key={rowKey(row)} className="data-grid-row">
                     {columns.map((col) => (
                       <td key={col.key} className={`px-5 py-3.5 text-cream/90 ${col.className || ""}`}>
                         {col.render ? col.render(row) : (row as Record<string, unknown>)[col.key] as ReactNode}
