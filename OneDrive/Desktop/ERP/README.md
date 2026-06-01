@@ -23,6 +23,20 @@ npm run dev
 - **API:** http://localhost:5000  
 - Configure MongoDB in `server/.env` (`MONGODB_URI`, `JWT_SECRET`)
 
+## Production (Render)
+
+**Live API:** https://erp-1-3f4g.onrender.com  
+
+| Use case | API URL |
+|----------|---------|
+| App hosted on Render (same service) | `/api` (automatic) |
+| Local dev against Render | `client/.env.local` → `VITE_API_URL=https://erp-1-3f4g.onrender.com/api` |
+| Default production build (remote API) | `https://erp-1-3f4g.onrender.com/api` |
+
+Deploy with [render.yaml](./render.yaml) or set **Build:** `npm run install:all && npm run build` and **Start:** `npm run start --prefix server`.
+
+Set on Render: `MONGODB_URI`, `JWT_SECRET`, `CLIENT_URL=https://erp-1-3f4g.onrender.com`
+
 Create an account via **Sign up** on the login screen (first user can be promoted to `admin` in MongoDB if needed).
 
 > **Note:** Inventory uses a new flat product schema (`productId`, `brand`, `modelNumber`, etc.). If you have old dynamic `data` map records, clear the `inventoryitems` collection or re-import products.

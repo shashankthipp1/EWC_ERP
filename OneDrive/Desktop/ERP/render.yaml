@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: erp
+    runtime: node
+    buildCommand: npm run install:all && npm run build
+    startCommand: npm run start --prefix server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_URL
+        value: https://erp-1-3f4g.onrender.com
