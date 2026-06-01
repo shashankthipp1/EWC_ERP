@@ -33,6 +33,7 @@ import {
 } from "../data/productFields";
 import { Product } from "../types/product";
 import { currency, formatDate, productLabel } from "../utils/format";
+import { StockBadge } from "../components/ewc/StockBadge";
 import { exportRowsToExcel, exportRowsToPdf } from "../utils/exporters";
 
 const defaultShop = { shopName: APP_NAME, address: "", phone: "" };
@@ -232,9 +233,14 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
       ? [{ key: "purchasePrice", header: "Cost", render: (r: Product) => currency(r.purchasePrice ?? 0) } as Column<Product>]
       : []),
     {
+      key: "status",
+      header: "Status",
+      render: (r) => <StockBadge current={r.currentStock} minimum={r.minimumStock} large />
+    },
+    {
       key: "sellingPrice",
-      header: "Sell",
-      render: (r) => currency(r.sellingPrice)
+      header: "Sell price",
+      render: (r) => <span className="text-base font-semibold">{currency(r.sellingPrice)}</span>
     },
     ...(canManageInventory
       ? [

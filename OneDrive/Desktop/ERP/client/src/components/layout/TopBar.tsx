@@ -17,7 +17,7 @@ export function TopBar({ title, subtitle, sidebarCollapsed }: Props) {
     <header className={`sticky top-0 z-30 border-b border-line bg-navyLight/85 backdrop-blur-xl ${pad}`} style={{ paddingTop: "max(0px, env(safe-area-inset-top))" }}>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 lg:px-8">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">Operations center</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">EWC Retail</p>
           <h1 className="font-display text-xl font-bold tracking-tight text-cream sm:text-2xl">{title}</h1>
           {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
         </div>

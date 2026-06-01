@@ -1,40 +1,37 @@
-/** Venue / hospitality POS design tokens (CSS variables set in index.css). */
+/** EWC Retail Management System — design tokens */
 export const brand = {
-  name: "VenueOS",
-  tagline: "Restaurant · Hotel · Retail",
-  product: "Unified operations platform"
+  name: "EWC ERP",
+  shortName: "EWC",
+  header: "EWC Retail Management System",
+  tagline: "Smart Inventory • Smart Billing • Smart Business"
 } as const;
 
-export const navSections = [
-  {
-    label: "Command",
-    items: [
-      { to: "/", label: "Dashboard", icon: "LayoutDashboard" as const, end: true },
-      { to: "/billing", label: "Point of Sale", icon: "ScanLine" as const },
-      { to: "/notifications", label: "Live feed", icon: "Bell" as const }
-    ]
-  },
-  {
-    label: "Operations",
-    items: [
-      { to: "/inventory", label: "Inventory", icon: "Package" as const },
-      { to: "/orders", label: "Purchase orders", icon: "Truck" as const },
-      { to: "/customers", label: "Guests & CRM", icon: "Users" as const },
-      { to: "/repairs", label: "Service desk", icon: "Wrench" as const }
-    ]
-  },
-  {
-    label: "Finance",
-    items: [
-      { to: "/finance", label: "Expenses", icon: "Wallet" as const },
-      { to: "/reports", label: "Reports", icon: "BarChart3" as const }
-    ]
-  },
-  {
-    label: "Admin",
-    items: [
-      { to: "/staff", label: "Team", icon: "UserCog" as const },
-      { to: "/settings", label: "Settings", icon: "Settings" as const }
-    ]
-  }
+export type MainNavIcon =
+  | "LayoutDashboard"
+  | "Package"
+  | "ScanLine"
+  | "ReceiptText"
+  | "Truck"
+  | "BarChart3"
+  | "UserCog"
+  | "Settings";
+
+export type MainNavItem = {
+  to: string;
+  label: string;
+  icon: MainNavIcon;
+  end?: boolean;
+  adminOnly?: boolean;
+};
+
+/** Simple menu — icon + label for every item */
+export const mainNav: MainNavItem[] = [
+  { to: "/", label: "Dashboard", icon: "LayoutDashboard", end: true },
+  { to: "/inventory", label: "Inventory", icon: "Package" },
+  { to: "/billing", label: "Billing", icon: "ScanLine" },
+  { to: "/sales", label: "Sales", icon: "ReceiptText" },
+  { to: "/orders", label: "Purchases", icon: "Truck" },
+  { to: "/reports", label: "Reports", icon: "BarChart3" },
+  { to: "/staff", label: "Users", icon: "UserCog", adminOnly: true },
+  { to: "/settings", label: "Settings", icon: "Settings" }
 ];

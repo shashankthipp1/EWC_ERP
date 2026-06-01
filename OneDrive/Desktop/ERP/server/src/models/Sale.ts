@@ -27,7 +27,12 @@ const saleSchema = new mongoose.Schema(
     gstAmount: { type: Number, default: 0 },
     totalAmount: Number,
     paidAmount: Number,
-    paymentMethod: { type: String, enum: ["Cash", "UPI", "Card", "Bank Transfer", "Credit"], default: "Cash" },
+    paymentMethod: { type: String, enum: ["Cash", "UPI", "Card", "Mixed", "Bank Transfer", "Credit"], default: "Cash" },
+    paymentBreakdown: {
+      cash: { type: Number, default: 0 },
+      upi: { type: Number, default: 0 },
+      card: { type: Number, default: 0 }
+    },
     status: { type: String, enum: ["Paid", "Partial", "Pending"], default: "Paid" },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
   },

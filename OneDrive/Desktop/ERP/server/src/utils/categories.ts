@@ -80,6 +80,7 @@ export const EXPENSE_CATEGORIES = [
 ] as const;
 
 export const PAYMENT_MODES = ["Cash", "UPI", "Card"] as const;
+export const SALE_PAYMENT_MODES = ["Cash", "UPI", "Card", "Mixed"] as const;
 
 export function normalizeCategory(category: string): string {
   const c = category.trim();

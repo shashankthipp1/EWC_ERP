@@ -1,35 +1,18 @@
-import {
-  BarChart3,
-  Bell,
-  LogOut,
-  MoreHorizontal,
-  Package,
-  ScanLine,
-  Settings,
-  Truck,
-  Wallet,
-  Wrench,
-  X
-} from "lucide-react";
+import { LayoutDashboard, LogOut, MoreHorizontal, Package, ReceiptText, ScanLine, X } from "lucide-react";
 import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { brand } from "../../design-system/tokens";
+import { brand, mainNav } from "../../design-system/tokens";
+import { usePermissions } from "../../hooks/usePermissions";
+import { navIconMap } from "./navIcons";
 import { Badge, Button } from "../ui";
 
-const dock = [
-  { to: "/", label: "Home", icon: BarChart3, end: true },
-  { to: "/billing", label: "POS", icon: ScanLine },
+const dockPrimary = [
+  { to: "/", label: "Home", icon: LayoutDashboard, end: true },
   { to: "/inventory", label: "Stock", icon: Package },
-  { to: "/orders", label: "PO", icon: Truck }
-];
-
-const more = [
-  { to: "/notifications", label: "Feed", icon: Bell },
-  { to: "/finance", label: "Spend", icon: Wallet },
-  { to: "/repairs", label: "Service", icon: Wrench },
-  { to: "/settings", label: "Setup", icon: Settings }
-];
+  { to: "/billing", label: "Bill", icon: ScanLine },
+  { to: "/sales", label: "Sales", icon: ReceiptText }
+] as const;
 
 type Props = {
   menuOpen: boolean;
@@ -40,6 +23,8 @@ type Props = {
 export function MobileDock({ menuOpen, onMenuOpen, onMenuClose }: Props) {
   const { pathname } = useLocation();
   const { user, logout } = useAuth();
+  const { canManageUsers } = usePermissions();
+  const moreItems = mainNav.filter((n) => !dockPrimary.some((d) => d.to === n.to)).filter((i) => !i.adminOnly || canManageUsers);
 
   useEffect(() => {
     onMenuClose();
@@ -56,81 +41,77 @@ export function MobileDock({ menuOpen, onMenuOpen, onMenuClose }: Props) {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-navyLight/95 backdrop-blur-xl lg:hidden"
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-navyLight/98 backdrop-blur-xl lg:hidden"
         style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
       >
-        <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 pt-1">
-          {dock.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className="flex flex-1 justify-center">
+        <div className="grid grid-cols-5 gap-0 px-1 pt-1">
+          {dockPrimary.map((item) => (
+            <NavLink key={item.to} to={item.to} end={"end" in item ? item.end : false} className="flex justify-center">
               {({ isActive }) => (
-                <span
-                  className={`flex min-h-[52px] min-w-[56px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[10px] font-semibold ${
-                    isActive ? "text-brand" : "text-muted"
-                  }`}
-                >
-                  <item.icon size={22} strokeWidth={isActive ? 2.25 : 1.75} />
+                <span className={`flex min-h-[56px] min-w-[56px] flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${isActive ? "text-brand" : "text-muted"}`}>
+                  <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} />
                   {item.label}
                 </span>
               )}
             </NavLink>
           ))}
-          <button type="button" onClick={onMenuOpen} className="flex min-h-[52px] flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-muted">
-            <MoreHorizontal size={22} />
+          <button type="button" onClick={onMenuOpen} className="flex min-h-[56px] flex-col items-center justify-center text-[11px] font-bold text-muted">
+            <MoreHorizontal size={24} />
             More
           </button>
         </div>
       </nav>
 
-      {menuOpen && <button type="button" className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm lg:hidden" onClick={onMenuClose} aria-label="Close" />}
+      {menuOpen && <button type="button" className="fixed inset-0 z-50 bg-black/50 lg:hidden" onClick={onMenuClose} aria-label="Close" />}
 
       <aside
-        className={`fixed bottom-0 left-0 right-0 z-[60] max-h-[88vh] overflow-hidden rounded-t-3xl border border-line bg-panel shadow-panel transition-transform duration-300 lg:hidden ${
+        className={`fixed bottom-0 left-0 right-0 z-[60] max-h-[90vh] overflow-hidden rounded-t-3xl border border-line bg-panel shadow-panel transition-transform lg:hidden ${
           menuOpen ? "translate-y-0" : "translate-y-full pointer-events-none"
         }`}
         style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
-            <p className="font-display font-bold text-cream">{brand.name}</p>
-            <p className="text-xs text-muted">{brand.tagline}</p>
+            <p className="font-display text-lg font-bold">{brand.name}</p>
+            <p className="text-sm text-muted">{brand.tagline}</p>
           </div>
-          <button type="button" onClick={onMenuClose} className="grid h-10 w-10 place-items-center rounded-xl border border-line">
-            <X size={18} />
+          <button type="button" onClick={onMenuClose} className="grid h-12 w-12 place-items-center rounded-xl border border-line">
+            <X size={22} />
           </button>
         </div>
-        <div className="overflow-y-auto px-4 py-3">
+        <div className="overflow-y-auto px-4 py-4">
           {user && (
             <div className="mb-4 rounded-2xl border border-line bg-surface-2 p-4">
-              <div className="flex justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">{user.name}</p>
-                  <p className="truncate text-xs text-muted">{user.email}</p>
-                </div>
-                <Badge tone="brand">{user.role}</Badge>
-              </div>
+              <p className="font-semibold">{user.name}</p>
+              <Badge tone="brand" className="mt-2">
+                {user.role}
+              </Badge>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            {more.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={onMenuClose}
-                className={({ isActive }) =>
-                  `flex min-h-[48px] items-center gap-2 rounded-xl border px-3 text-sm font-medium ${
-                    isActive ? "border-brand/40 bg-brand/10 text-brand" : "border-line text-cream/80"
-                  }`
-                }
-              >
-                <item.icon size={18} />
-                {item.label}
-              </NavLink>
-            ))}
+          <div className="grid gap-2">
+            {moreItems.map((item) => {
+              const Icon = navIconMap[item.icon];
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={onMenuClose}
+                  className={({ isActive }) =>
+                    `flex min-h-[52px] items-center gap-4 rounded-2xl border px-4 text-base font-semibold ${
+                      isActive ? "border-brand/40 bg-brand/10 text-brand" : "border-line"
+                    }`
+                  }
+                >
+                  <Icon size={22} />
+                  {item.label}
+                </NavLink>
+              );
+            })}
           </div>
         </div>
         <div className="border-t border-line p-4">
-          <Button variant="secondary" className="w-full" onClick={() => { onMenuClose(); logout(); }}>
-            <LogOut size={16} /> Sign out
+          <Button variant="secondary" className="w-full min-h-[52px] text-base" onClick={() => { onMenuClose(); logout(); }}>
+            <LogOut size={20} /> Sign out
           </Button>
         </div>
       </aside>

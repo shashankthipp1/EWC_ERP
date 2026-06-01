@@ -1,68 +1,43 @@
-import { CreditCard, Minus, Plus, Printer, ReceiptText, Search, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { CreditCard, Minus, Plus, Printer, ReceiptText, Search, Share2, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { api } from "../api/http";
-import { ConfirmDialog } from "../components/ConfirmDialog";
+import { StockBadge } from "../components/ewc/StockBadge";
 import { Badge, Button, Card, Field, PageShell, inputClass } from "../components/ui";
 import { PAYMENT_MODES } from "../data/categories";
 import { Product } from "../types/product";
-import { currency, formatDate, productLabel } from "../utils/format";
+import { downloadInvoicePdf, printInvoice, shareInvoice, type InvoiceData } from "../utils/invoice";
+import { currency, productLabel } from "../utils/format";
 
 type CartItem = Product & { saleQty: number; sellingPriceOverride: number };
 
-type SaleRecord = {
-  _id: string;
-  billNumber: string;
-  totalAmount: number;
-  paidAmount: number;
-  paymentMethod: string;
-  status: string;
-  createdAt: string;
-  customerSnapshot?: { name?: string; phone?: string };
-  items: Array<{ description?: string; quantity: number }>;
-};
-
 export function Billing() {
   const [items, setItems] = useState<Product[]>([]);
-  const [sales, setSales] = useState<SaleRecord[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [q, setQ] = useState("");
-  const [salesQ, setSalesQ] = useState("");
   const [customer, setCustomer] = useState({ name: "", phone: "", address: "" });
-  const [paymentMethod, setPaymentMethod] = useState("Cash");
-  const [deleteTarget, setDeleteTarget] = useState<SaleRecord | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
+  const [discount, setDiscount] = useState(0);
+  const [gstPercent, setGstPercent] = useState(0);
+  const [mixed, setMixed] = useState({ cash: 0, upi: 0, card: 0 });
   const [checkingOut, setCheckingOut] = useState(false);
+  const [lastBill, setLastBill] = useState<InvoiceData | null>(null);
 
-  const total = useMemo(
+  const subtotal = useMemo(
     () => cart.reduce((sum, item) => sum + (item.sellingPriceOverride || item.sellingPrice) * item.saleQty, 0),
     [cart]
   );
-
-  const loadSales = useCallback(async () => {
-    const { data } = await api.get("/sales");
-    setSales(data.sales);
-  }, []);
+  const gstAmount = useMemo(() => subtotal * (gstPercent / 100), [subtotal, gstPercent]);
+  const total = useMemo(() => Math.max(0, subtotal + gstAmount - discount), [subtotal, gstAmount, discount]);
 
   useEffect(() => {
     api.get("/inventory", { params: { q, limit: 80 } }).then((res) => setItems(res.data.items));
   }, [q]);
 
   useEffect(() => {
-    loadSales();
-  }, [loadSales]);
-
-  const filteredSales = useMemo(() => {
-    const term = salesQ.trim().toLowerCase();
-    if (!term) return sales;
-    return sales.filter(
-      (s) =>
-        s.billNumber.toLowerCase().includes(term) ||
-        s.customerSnapshot?.name?.toLowerCase().includes(term) ||
-        s.customerSnapshot?.phone?.includes(term) ||
-        s.paymentMethod.toLowerCase().includes(term)
-    );
-  }, [sales, salesQ]);
+    if (paymentMethod !== "Mixed") return;
+    setMixed((m) => ({ ...m, cash: total }));
+  }, [paymentMethod, total]);
 
   function pick(item: Product) {
     if (item.currentStock < 1) return toast.error("Out of stock");
@@ -90,10 +65,18 @@ export function Billing() {
   async function createBill() {
     setCheckingOut(true);
     try {
+      const paidAmount = paymentMethod === "Mixed" ? mixed.cash + mixed.upi + mixed.card : total;
+      if (paymentMethod === "Mixed" && Math.abs(paidAmount - total) > 0.02) {
+        toast.error("Mixed payment must equal the bill total");
+        return;
+      }
       const { data } = await api.post("/sales", {
         customer,
         paymentMethod,
-        paidAmount: total,
+        discount,
+        gstPercent,
+        paidAmount,
+        paymentBreakdown: paymentMethod === "Mixed" ? mixed : undefined,
         items: cart.map((item) => ({
           inventoryItem: item._id,
           quantity: item.saleQty,
@@ -101,109 +84,107 @@ export function Billing() {
           description: productLabel(item)
         }))
       });
-      toast.success(`Ticket ${data.sale.billNumber} — ${currency(total)}`);
+      const sale = data.sale;
+      const invoice: InvoiceData = {
+        billNumber: sale.billNumber,
+        createdAt: sale.createdAt,
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        items: cart.map((item) => ({
+          description: productLabel(item),
+          quantity: item.saleQty,
+          sellingPrice: item.sellingPriceOverride || item.sellingPrice,
+          total: (item.sellingPriceOverride || item.sellingPrice) * item.saleQty
+        })),
+        subtotal,
+        discount,
+        gstAmount,
+        totalAmount: total,
+        paymentMethod,
+        paymentNote:
+          paymentMethod === "Mixed"
+            ? `Cash ${currency(mixed.cash)} · UPI ${currency(mixed.upi)} · Card ${currency(mixed.card)}`
+            : undefined
+      };
+      setLastBill(invoice);
+      toast.success(`Bill ${sale.billNumber} — ${currency(total)}`);
       setCart([]);
-      loadSales();
+      setDiscount(0);
+      setGstPercent(0);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg || "Checkout failed");
+      toast.error(msg || "Could not complete bill");
     } finally {
       setCheckingOut(false);
     }
   }
 
-  async function confirmDeleteSale() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await api.delete(`/sales/${deleteTarget._id}`);
-      toast.success("Voided — stock restored");
-      setDeleteTarget(null);
-      loadSales();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg || "Void failed");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
   return (
     <PageShell>
-      <div className="grid min-h-[calc(100vh-12rem)] gap-4 xl:grid-cols-[1fr_400px]">
-        {/* Product grid — cashier left */}
+      <div className="grid min-h-[calc(100vh-12rem)] gap-4 xl:grid-cols-[1fr_420px]">
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-2 rounded-2xl border border-line bg-panel/90 p-2 shadow-soft">
-            <Search className="ml-2 shrink-0 text-muted" size={20} />
+            <Search className="ml-2 shrink-0 text-muted" size={24} />
             <input
-              className="min-h-[48px] flex-1 bg-transparent text-base outline-none placeholder:text-muted"
+              className="min-h-[52px] flex-1 bg-transparent text-lg outline-none placeholder:text-muted"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Scan or search SKU, brand, model…"
+              placeholder="Search product name or model…"
               autoFocus
             />
           </div>
 
-          <div className="grid flex-1 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 lg:grid-cols-3 2xl:grid-cols-4">
             {items.map((item) => (
               <button
                 key={item._id}
                 type="button"
                 onClick={() => pick(item)}
                 disabled={item.currentStock < 1}
-                className="flex flex-col rounded-2xl border border-line bg-surface-2/80 p-3 text-left transition hover:border-brand/40 hover:shadow-lift active:scale-[0.98] disabled:opacity-40"
+                className="flex min-h-[120px] flex-col rounded-2xl border border-line bg-surface-2/80 p-4 text-left transition hover:border-brand/40 active:scale-[0.98] disabled:opacity-40"
               >
-                <p className="line-clamp-2 text-sm font-semibold text-cream">{productLabel(item)}</p>
-                <p className="mt-1 font-mono text-[10px] text-muted">{item.productId}</p>
-                <div className="mt-auto flex items-end justify-between pt-3">
-                  <span className="text-lg font-bold text-brand">{currency(item.sellingPrice)}</span>
-                  <Badge tone={item.currentStock <= item.minimumStock ? "danger" : "neutral"}>{item.currentStock} left</Badge>
+                <p className="line-clamp-2 text-base font-bold text-cream">{productLabel(item)}</p>
+                <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+                  <span className="text-xl font-bold text-brand">{currency(item.sellingPrice)}</span>
+                  <StockBadge current={item.currentStock} minimum={item.minimumStock} />
                 </div>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Cart — POS ticket */}
-        <Card className="flex flex-col border-brand/20 shadow-lift">
-          <div className="mb-4 flex items-center justify-between border-b border-line pb-4">
-            <div className="flex items-center gap-2">
-              <ReceiptText className="text-brand" size={22} />
-              <div>
-                <p className="font-display font-bold text-cream">Current ticket</p>
-                <p className="text-xs text-muted">{cart.length} line items</p>
-              </div>
+        <Card className="sticky top-24 flex flex-col border-brand/20 shadow-lift max-xl:bottom-20">
+          <div className="mb-4 flex items-center gap-3 border-b border-line pb-4">
+            <ReceiptText className="text-brand" size={28} />
+            <div>
+              <p className="text-xl font-bold text-cream">Current bill</p>
+              <p className="text-base text-muted">{cart.length} items</p>
             </div>
-            {cart.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setCart([])}>
-                Clear
-              </Button>
-            )}
           </div>
 
-          <div className="flex-1 space-y-2 overflow-y-auto" style={{ maxHeight: "min(40vh, 320px)" }}>
+          <div className="flex-1 space-y-2 overflow-y-auto" style={{ maxHeight: "min(36vh, 280px)" }}>
             {cart.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted">Tap products to add to ticket</p>
+              <p className="py-12 text-center text-base text-muted">Tap products on the left to add them</p>
             ) : (
               cart.map((line) => (
-                <div key={line._id} className="rounded-xl border border-line bg-navyLight/50 p-3">
+                <div key={line._id} className="rounded-xl border border-line bg-navyLight/50 p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium leading-snug">{productLabel(line)}</p>
+                    <p className="text-base font-semibold leading-snug">{productLabel(line)}</p>
                     <button type="button" onClick={() => removeLine(line._id)} className="text-muted hover:text-danger">
-                      <Trash2 size={16} />
+                      <Trash2 size={20} />
                     </button>
                   </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <div className="flex items-center gap-1 rounded-lg border border-line bg-surface-2 p-0.5">
-                      <button type="button" className="pos-key !min-h-9 !w-9 !text-base" onClick={() => adjustQty(line._id, -1)}>
-                        <Minus size={16} />
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex items-center gap-1 rounded-xl border border-line bg-surface-2 p-1">
+                      <button type="button" className="pos-key !min-h-11 !w-11" onClick={() => adjustQty(line._id, -1)}>
+                        <Minus size={18} />
                       </button>
-                      <span className="min-w-[2rem] text-center font-bold">{line.saleQty}</span>
-                      <button type="button" className="pos-key !min-h-9 !w-9 !text-base" onClick={() => adjustQty(line._id, 1)}>
-                        <Plus size={16} />
+                      <span className="min-w-[2.5rem] text-center text-lg font-bold">{line.saleQty}</span>
+                      <button type="button" className="pos-key !min-h-11 !w-11" onClick={() => adjustQty(line._id, 1)}>
+                        <Plus size={18} />
                       </button>
                     </div>
-                    <span className="font-bold text-brand">
+                    <span className="text-xl font-bold text-brand">
                       {currency((line.sellingPriceOverride || line.sellingPrice) * line.saleQty)}
                     </span>
                   </div>
@@ -212,89 +193,104 @@ export function Billing() {
             )}
           </div>
 
-          <div className="mt-4 space-y-3 border-t border-line pt-4">
-            <Field label="Guest name">
-              <input className={inputClass} value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} placeholder="Optional" />
+          <div className="mt-4 grid gap-3 border-t border-line pt-4">
+            <Field label="Customer name (optional)">
+              <input className={`${inputClass} min-h-[48px] text-base`} value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} />
             </Field>
-            <Field label="Phone">
-              <input className={inputClass} value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} />
+            <Field label="Phone (optional)">
+              <input className={`${inputClass} min-h-[48px] text-base`} value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} />
             </Field>
-            <Field label="Payment">
-              <select className={inputClass} value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Discount (₹)">
+                <input
+                  type="number"
+                  min={0}
+                  className={`${inputClass} min-h-[48px] text-base`}
+                  value={discount || ""}
+                  onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
+                />
+              </Field>
+              <Field label="Tax %">
+                <input
+                  type="number"
+                  min={0}
+                  max={28}
+                  className={`${inputClass} min-h-[48px] text-base`}
+                  value={gstPercent || ""}
+                  onChange={(e) => setGstPercent(Math.max(0, Number(e.target.value) || 0))}
+                />
+              </Field>
+            </div>
+            <Field label="How did they pay?">
+              <select className={`${inputClass} min-h-[52px] text-base`} value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
                 {PAYMENT_MODES.map((m) => (
-                  <option key={m}>{m}</option>
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
                 ))}
               </select>
             </Field>
+            {paymentMethod === "Mixed" && (
+              <div className="grid gap-2 rounded-xl border border-line bg-surface-2 p-3">
+                <p className="text-sm font-semibold text-muted">Split amount (must equal total)</p>
+                {(["cash", "upi", "card"] as const).map((key) => (
+                  <Field key={key} label={key.toUpperCase()}>
+                    <input
+                      type="number"
+                      min={0}
+                      className={`${inputClass} min-h-[44px]`}
+                      value={mixed[key] || ""}
+                      onChange={(e) => setMixed({ ...mixed, [key]: Number(e.target.value) || 0 })}
+                    />
+                  </Field>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="mt-4 flex items-center justify-between rounded-xl bg-brand/10 px-4 py-3">
-            <span className="text-sm font-medium text-muted">Total due</span>
-            <span className="font-display text-3xl font-bold text-brand">{currency(total)}</span>
+          <div className="mt-4 space-y-1 rounded-xl bg-brand/10 px-4 py-3 text-base">
+            <div className="flex justify-between text-muted">
+              <span>Subtotal</span>
+              <span>{currency(subtotal)}</span>
+            </div>
+            {gstAmount > 0 && (
+              <div className="flex justify-between text-muted">
+                <span>Tax</span>
+                <span>{currency(gstAmount)}</span>
+              </div>
+            )}
+            {discount > 0 && (
+              <div className="flex justify-between text-muted">
+                <span>Discount</span>
+                <span>-{currency(discount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between pt-2 text-xl font-bold text-brand">
+              <span>Total</span>
+              <span>{currency(total)}</span>
+            </div>
           </div>
 
-          <Button disabled={!cart.length || checkingOut} onClick={createBill} className="mt-4 w-full" size="lg">
-            <CreditCard size={20} />
-            {checkingOut ? "Processing…" : "Charge & print"}
-            <Printer size={18} className="ml-auto opacity-70" />
+          <Button disabled={!cart.length || checkingOut} onClick={createBill} className="mt-4 w-full min-h-[56px] text-lg" size="lg">
+            <CreditCard size={22} />
+            {checkingOut ? "Saving…" : "Save bill"}
           </Button>
+
+          {lastBill && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="secondary" className="min-h-[44px] flex-1" onClick={() => printInvoice(lastBill)}>
+                <Printer size={18} /> Print
+              </Button>
+              <Button variant="secondary" className="min-h-[44px] flex-1" onClick={() => downloadInvoicePdf(lastBill)}>
+                PDF
+              </Button>
+              <Button variant="secondary" className="min-h-[44px] flex-1" onClick={() => shareInvoice(lastBill).catch(() => toast.error("Share not available"))}>
+                <Share2 size={18} /> Share
+              </Button>
+            </div>
+          )}
         </Card>
       </div>
-
-      <Card className="mt-6">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="font-display text-lg font-semibold">Recent tickets ({filteredSales.length})</h2>
-          <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3">
-            <Search size={16} className="text-muted" />
-            <input
-              className="min-h-[40px] w-full min-w-[200px] bg-transparent text-sm outline-none"
-              placeholder="Bill #, guest, phone…"
-              value={salesQ}
-              onChange={(e) => setSalesQ(e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="overflow-hidden rounded-xl border border-line">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-line bg-surface-2/80 text-left text-[11px] font-bold uppercase tracking-wider text-muted">
-                <th className="px-4 py-3">Ticket</th>
-                <th className="px-4 py-3">Guest</th>
-                <th className="px-4 py-3">Pay</th>
-                <th className="px-4 py-3">Total</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSales.slice(0, 20).map((sale) => (
-                <tr key={sale._id} className="data-grid-row">
-                  <td className="px-4 py-3">
-                    <p className="font-mono font-semibold text-brand">{sale.billNumber}</p>
-                    <p className="text-xs text-muted">{formatDate(sale.createdAt)}</p>
-                  </td>
-                  <td className="px-4 py-3">{sale.customerSnapshot?.name || "—"}</td>
-                  <td className="px-4 py-3">{sale.paymentMethod}</td>
-                  <td className="px-4 py-3 font-semibold">{currency(sale.totalAmount)}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Button variant="ghost" size="sm" className="!text-danger" onClick={() => setDeleteTarget(sale)}>
-                      Void
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        title="Void ticket?"
-        message={deleteTarget ? `Remove ${deleteTarget.billNumber}? Inventory will be restored.` : ""}
-        onConfirm={confirmDeleteSale}
-        onCancel={() => setDeleteTarget(null)}
-        loading={deleting}
-      />
     </PageShell>
   );
 }

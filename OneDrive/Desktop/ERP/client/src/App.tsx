@@ -4,6 +4,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Billing } from "./pages/Billing";
 import { Customers } from "./pages/Customers";
 import { Dashboard } from "./pages/Dashboard";
+import { Sales } from "./pages/Sales";
 import { Finance } from "./pages/Finance";
 import { InventoryHub } from "./pages/InventoryHub";
 import { Login } from "./pages/Login";
@@ -24,6 +25,7 @@ export function App() {
             <Route index element={<Dashboard />} />
             <Route path="inventory" element={<InventoryHub />} />
             <Route path="billing" element={<Billing />} />
+            <Route path="sales" element={<Sales />} />
             <Route path="orders" element={<Orders />} />
             <Route path="repairs" element={<Repairs />} />
             <Route path="finance" element={<Finance />} />

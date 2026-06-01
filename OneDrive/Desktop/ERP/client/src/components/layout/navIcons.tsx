@@ -1,26 +1,20 @@
 import {
   BarChart3,
-  Bell,
   LayoutDashboard,
   Package,
+  ReceiptText,
   ScanLine,
   Settings,
   Truck,
-  UserCog,
-  Users,
-  Wallet,
-  Wrench
+  UserCog
 } from "lucide-react";
 
 export const navIconMap = {
   LayoutDashboard,
-  ScanLine,
-  Bell,
   Package,
+  ScanLine,
+  ReceiptText,
   Truck,
-  Users,
-  Wrench,
-  Wallet,
   BarChart3,
   UserCog,
   Settings

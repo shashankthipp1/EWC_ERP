@@ -3,10 +3,23 @@ import { protect } from "../middleware/auth.js";
 import { Customer } from "../models/Customer.js";
 import { InventoryItem } from "../models/InventoryItem.js";
 import { Sale } from "../models/Sale.js";
+import { canViewCost } from "../utils/roles.js";
 import { nextNumber } from "../utils/numbers.js";
 
 const router = Router();
 router.use(protect);
+
+function stripSaleForRole(sale: { toObject?: () => Record<string, unknown> }, role?: string) {
+  const raw = typeof sale.toObject === "function" ? sale.toObject() : ({ ...(sale as object) } as Record<string, unknown>);
+  if (canViewCost(role)) return raw;
+  if (Array.isArray(raw.items)) {
+    raw.items = raw.items.map((line: Record<string, unknown>) => {
+      const { purchasePrice: _p, ...rest } = line;
+      return rest;
+    });
+  }
+  return raw;
+}
 
 router.get("/", async (req, res, next) => {
   try {
@@ -15,7 +28,7 @@ router.get("/", async (req, res, next) => {
       .populate("createdBy", "name")
       .sort({ createdAt: -1 })
       .limit(500);
-    res.json({ sales });
+    res.json({ sales: sales.map((s) => stripSaleForRole(s, req.user?.role)) });
   } catch (err) {
     next(err);
   }
@@ -63,8 +76,23 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    const totalAmount = subtotal + gstAmount;
+    const billDiscount = Math.max(0, Number(req.body.discount || 0));
+    const billGstPercent = Number(req.body.gstPercent || 0);
+    if (billGstPercent > 0 && gstAmount === 0) {
+      gstAmount = subtotal * (billGstPercent / 100);
+    }
+    const totalAmount = Math.max(0, subtotal + gstAmount - billDiscount);
     const paidAmount = Number(req.body.paidAmount ?? totalAmount);
+    const paymentMethod = req.body.paymentMethod || "Cash";
+
+    if (paymentMethod === "Mixed") {
+      const b = req.body.paymentBreakdown || {};
+      const mixSum = Number(b.cash || 0) + Number(b.upi || 0) + Number(b.card || 0);
+      if (Math.abs(mixSum - paidAmount) > 0.02) {
+        return res.status(400).json({ message: "Mixed payment amounts must equal the total paid" });
+      }
+    }
+
     const sale = await Sale.create({
       billNumber: nextNumber("SALE"),
       customer: customer?.id,
@@ -73,11 +101,12 @@ router.post("/", async (req, res, next) => {
         : req.body.customer,
       items: saleItems,
       subtotal,
-      discount: 0,
+      discount: billDiscount,
       gstAmount,
       totalAmount,
       paidAmount,
-      paymentMethod: req.body.paymentMethod || "Cash",
+      paymentMethod,
+      paymentBreakdown: req.body.paymentBreakdown,
       status: paidAmount >= totalAmount ? "Paid" : paidAmount > 0 ? "Partial" : "Pending",
       createdBy: req.user?.id
     });
@@ -87,7 +116,9 @@ router.post("/", async (req, res, next) => {
       await customer.save();
     }
 
-    res.status(201).json({ sale, grossProfit });
+    const payload: Record<string, unknown> = { sale: stripSaleForRole(sale, req.user?.role) };
+    if (canViewCost(req.user?.role)) payload.grossProfit = grossProfit;
+    res.status(201).json(payload);
   } catch (err) {
     next(err);
   }
@@ -118,7 +149,7 @@ router.delete("/:id", async (req, res, next) => {
     }
 
     await Sale.findByIdAndDelete(req.params.id);
-    res.json({ message: "Sale deleted and stock restored" });
+    res.json({ message: "Sale removed" });
   } catch (err) {
     next(err);
   }

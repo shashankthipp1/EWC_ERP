@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { api } from "../api/http";
+import { EwcReportHub } from "../components/ewc/EwcReportHub";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Button, Card, MetricCard, SectionHeader, inputClass } from "../components/ui";
 import { exportRowsToExcel, exportRowsToPdf } from "../utils/exporters";
@@ -209,6 +210,7 @@ export function Reports() {
 
   return (
     <div className="space-y-6">
+      <EwcReportHub />
       <SectionHeader
         eyebrow="Live from your shop data"
         title="Sales & Daily Reports"
