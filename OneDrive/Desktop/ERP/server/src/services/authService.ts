@@ -1,12 +1,13 @@
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { Request } from "express";
+import { getJwtSecret } from "../config/env.js";
 import { DeviceSession } from "../models/DeviceSession.js";
 
 export function createToken(userId: string, tokenId = crypto.randomUUID()) {
   return {
     tokenId,
-    token: jwt.sign({ id: userId, tokenId }, process.env.JWT_SECRET || "dev-secret", { expiresIn: "7d" })
+    token: jwt.sign({ id: userId, tokenId }, getJwtSecret(), { expiresIn: "7d" })
   };
 }
 

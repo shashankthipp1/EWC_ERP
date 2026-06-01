@@ -36,12 +36,20 @@ router.post("/signup", async (req, res, next) => {
         role: z.enum(["admin", "manager", "staff"]).optional()
       })
       .parse(req.body);
+    const email = normalizeEmail(body.email);
     const userCount = await User.countDocuments();
-    const user = await User.create({ ...body, email: normalizeEmail(body.email), role: userCount === 0 ? "admin" : body.role || "staff" });
+    const user = await User.create({ ...body, email, role: userCount === 0 ? "admin" : body.role || "staff" });
     const session = createToken(user.id);
     await createDeviceSession(req, user.id, session.tokenId);
+    console.info("[auth] signup ok", { email, origin: req.headers.origin || "(none)", ip: req.ip });
     res.status(201).json({ token: session.token, user: safeUser(user) });
   } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown";
+    console.warn("[auth] signup failed", {
+      origin: req.headers.origin || "(none)",
+      ip: req.ip,
+      message
+    });
     next(err);
   }
 });
@@ -51,6 +59,12 @@ router.post("/login", async (req, res, next) => {
     const body = z.object({ email: z.string().email().transform(normalizeEmail), password: z.string().min(1) }).parse(req.body);
     const user = await User.findOne({ email: body.email }).select("+password");
     if (!user || !(await verifyPassword(user, body.password))) {
+      console.warn("[auth] login rejected", {
+        email: body.email,
+        reason: user ? "invalid_password" : "user_not_found",
+        origin: req.headers.origin || "(none)",
+        ip: req.ip
+      });
       return res.status(401).json({ message: "Invalid email or password" });
     }
     user.lastLoginAt = new Date();
@@ -58,8 +72,14 @@ router.post("/login", async (req, res, next) => {
     await user.save();
     const session = createToken(user.id);
     await createDeviceSession(req, user.id, session.tokenId);
+    console.info("[auth] login ok", { email: body.email, origin: req.headers.origin || "(none)", ip: req.ip });
     res.json({ token: session.token, user: safeUser(user) });
   } catch (err) {
+    console.warn("[auth] login error", {
+      origin: req.headers.origin || "(none)",
+      ip: req.ip,
+      message: err instanceof Error ? err.message : "unknown"
+    });
     next(err);
   }
 });

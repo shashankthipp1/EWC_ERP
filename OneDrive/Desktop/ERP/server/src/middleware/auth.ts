@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { getJwtSecret } from "../config/env.js";
 import { DeviceSession } from "../models/DeviceSession.js";
 import { User } from "../models/User.js";
 
@@ -16,9 +17,12 @@ export async function protect(req: Request, res: Response, next: NextFunction) {
     const token = req.headers.authorization?.startsWith("Bearer ")
       ? req.headers.authorization.split(" ")[1]
       : undefined;
-    if (!token) return res.status(401).json({ message: "Authentication required" });
+    if (!token) {
+      console.warn("[auth] missing token", { path: req.originalUrl, origin: req.headers.origin || "(none)" });
+      return res.status(401).json({ message: "Authentication required" });
+    }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "dev-secret") as { id: string; tokenId?: string };
+    const decoded = jwt.verify(token, getJwtSecret()) as { id: string; tokenId?: string };
     if (decoded.tokenId) {
       const session = await DeviceSession.findOne({ tokenId: decoded.tokenId, revokedAt: { $exists: false } });
       if (!session) return res.status(401).json({ message: "Session has been revoked" });
@@ -30,7 +34,12 @@ export async function protect(req: Request, res: Response, next: NextFunction) {
 
     req.user = { id: user.id, role: user.role as "admin" | "manager" | "staff", name: user.name, email: user.email };
     next();
-  } catch {
+  } catch (err) {
+    console.warn("[auth] token invalid", {
+      path: req.originalUrl,
+      origin: req.headers.origin || "(none)",
+      message: err instanceof Error ? err.message : "unknown"
+    });
     res.status(401).json({ message: "Invalid or expired token" });
   }
 }

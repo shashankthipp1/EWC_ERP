@@ -1,5 +1,4 @@
 import cors from "cors";
-import dotenv from "dotenv";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
@@ -7,7 +6,9 @@ import morgan from "morgan";
 import path from "path";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
+import { buildAllowedOrigins, createCorsOptions } from "./config/cors.js";
 import { connectDb } from "./config/db.js";
+import { logStartupConfig, validateEnv } from "./config/env.js";
 import { ensureAdminUser } from "./utils/ensureAdmin.js";
 import { errorHandler, notFound } from "./middleware/error.js";
 import authRoutes from "./routes/auth.js";
@@ -23,44 +24,46 @@ import settingsRoutes from "./routes/settings.js";
 import reportsRoutes from "./routes/reports.js";
 import analyticsRoutes from "./routes/analytics.js";
 
-dotenv.config();
+validateEnv();
+logStartupConfig();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientDist = path.resolve(__dirname, "../../client/dist");
-
-const corsFromEnv = (process.env.CLIENT_URL || "")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
-const corsOrigins = [
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  "http://localhost:4173",
-  "https://erp-1-3f4g.onrender.com",
-  ...corsFromEnv
-];
+const allowedOrigins = buildAllowedOrigins();
+const corsOptions = createCorsOptions(allowedOrigins);
 
 const app = express();
+app.set("trust proxy", 1);
+
 app.use(
   helmet({
     contentSecurityPolicy: process.env.NODE_ENV === "production" ? false : undefined
   })
 );
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
+app.use(express.json({ limit: "2mb" }));
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) return callback(null, true);
-      const ok = corsOrigins.includes(origin) || origin.endsWith(".onrender.com");
-      callback(null, ok);
-    },
-    credentials: true
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 500,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => req.method === "OPTIONS"
   })
 );
-app.use(express.json({ limit: "2mb" }));
-app.use(morgan("dev"));
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 500 }));
 
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.get("/health", (_req, res) =>
+  res.json({
+    status: "ok",
+    env: process.env.NODE_ENV || "development",
+    corsOriginsConfigured: allowedOrigins.size
+  })
+);
+
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/inventory", inventoryRoutes);
@@ -75,6 +78,7 @@ app.use("/api/reports", reportsRoutes);
 app.use("/api/analytics", analyticsRoutes);
 
 if (existsSync(clientDist)) {
+  console.info("[startup] Serving client build from", clientDist);
   app.use(express.static(clientDist));
   app.get("*", (req, res, next) => {
     if (req.path.startsWith("/api") || req.path === "/health") return next();
@@ -89,9 +93,12 @@ const port = Number(process.env.PORT || 5000);
 connectDb()
   .then(async () => {
     await ensureAdminUser();
-    app.listen(port, () => console.log(`EWC ERP API running on port ${port}`));
+    app.listen(port, () => {
+      console.info(`[startup] EWC ERP API listening on port ${port}`);
+      console.info(`[startup] Health check: http://localhost:${port}/health`);
+    });
   })
   .catch((error) => {
-    console.error(error);
+    console.error("[startup] Failed to start server:", error);
     process.exit(1);
   });

@@ -25,17 +25,32 @@ npm run dev
 
 ## Production (Render)
 
-**Live API:** https://ewc-erp.onrender.com  
+**Live app:** https://ewc-erp.onrender.com (API + UI monolith when using [render.yaml](./render.yaml))
 
 | Use case | API URL |
 |----------|---------|
-| Production build | `client/.env.production` → `VITE_API_URL=https://ewc-erp.onrender.com` |
-| Local dev (default) | `client/.env.development` → `VITE_API_URL=http://localhost:5000` |
-| Local UI against live API | `client/.env.local` → `VITE_API_URL=https://ewc-erp.onrender.com` |
+| Render monolith (default) | Same-origin `/api` (automatic in production builds) |
+| Local dev | `client/.env.development` → `VITE_API_URL=http://localhost:5000` |
+| Local UI → live API | `client/.env.local` → `VITE_API_URL=https://ewc-erp.onrender.com` |
+| Separate frontend host | Set `VITE_API_URL=https://ewc-erp.onrender.com` at build time |
 
-Deploy with [render.yaml](./render.yaml) or set **Build:** `npm run install:all && npm run build` and **Start:** `npm run start --prefix server`.
+Deploy with [render.yaml](./render.yaml) or **Build:** `npm run install:all && npm run build` · **Start:** `npm run start --prefix server`.
 
-Set on Render: `MONGODB_URI`, `JWT_SECRET`, `CLIENT_URL=https://ewc-erp.onrender.com`
+**Required Render env vars:** `MONGODB_URI`, `JWT_SECRET`, `CLIENT_URL=https://ewc-erp.onrender.com` (add every extra frontend origin, comma-separated, if not on `*.onrender.com`).
+
+### Deployment checklist
+
+1. Render → **Environment**: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CLIENT_URL` (your public site URL(s)).
+2. Redeploy after env changes (JWT and CORS are read at startup).
+3. Open `https://<your-service>.onrender.com/health` → `{ "status": "ok" }`.
+4. Open the app, DevTools → Network → `POST /api/auth/login` must be **same origin** or show `Access-Control-Allow-Origin` matching your site.
+5. Sign up, then log in; confirm `erp_token` in localStorage.
+
+### Troubleshooting CORS on Render
+
+- **Monolith:** Do not set `VITE_API_URL` to a different host unless intentional.
+- **Split UI/API:** Set `VITE_API_URL` to the API host at **build** time; set `CLIENT_URL` on the API to the UI origin.
+- Check Render logs for `[CORS] Blocked request from origin:` and add that URL to `CLIENT_URL`.
 
 Create an account via **Sign up** on the login screen (first user can be promoted to `admin` in MongoDB if needed).
 

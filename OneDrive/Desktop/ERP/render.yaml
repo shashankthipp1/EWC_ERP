@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: erp
+    name: ewc-erp
     runtime: node
     buildCommand: npm run install:all && npm run build
     startCommand: npm run start --prefix server
@@ -8,4 +8,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: CLIENT_URL
-        value: https://erp-1-3f4g.onrender.com
+        value: https://ewc-erp.onrender.com
+      # Set in Render dashboard (required):
+      # MONGODB_URI — MongoDB Atlas connection string
+      # JWT_SECRET — long random secret (never use the example value)
