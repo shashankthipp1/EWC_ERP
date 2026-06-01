@@ -17,6 +17,7 @@ import {
   emptyProduct,
   formValuesForFields,
   getInventoryFieldDefs,
+  mergeCategoryChange,
   productDisplayLabel,
   productFromInventory,
   toInventoryPayload,
@@ -88,16 +89,31 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
     setShowForm(true);
   }
 
-  function openEdit(item: Product) {
-    setEditing(item);
-    setForm({
-      ...productFromInventory(item),
-      currentStock: Number(item.currentStock) || 0,
-      purchasePrice: Number(item.purchasePrice) || 0,
-      sellingPrice: Number(item.sellingPrice) || 0,
-      minimumStock: Number(item.minimumStock) || 5
-    });
+  async function openEdit(item: Product) {
     setShowForm(true);
+    setEditing(item);
+    try {
+      const { data } = await api.get(`/inventory/${item._id}`);
+      const full = data.item as Product;
+      setEditing(full);
+      setForm({
+        ...productFromInventory(full),
+        currentStock: Number(full.currentStock) || 0,
+        purchasePrice: Number(full.purchasePrice) || 0,
+        sellingPrice: Number(full.sellingPrice) || 0,
+        mrp: Number(full.mrp) || Number(full.sellingPrice) || 0,
+        minimumStock: Number(full.minimumStock) || 5
+      });
+    } catch {
+      setForm({
+        ...productFromInventory(item),
+        currentStock: Number(item.currentStock) || 0,
+        purchasePrice: Number(item.purchasePrice) || 0,
+        sellingPrice: Number(item.sellingPrice) || 0,
+        mrp: Number(item.mrp) || Number(item.sellingPrice) || 0,
+        minimumStock: Number(item.minimumStock) || 5
+      });
+    }
   }
 
   async function saveStock(id: string, qty: number) {
@@ -115,16 +131,22 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
   function updateField(key: FieldKey, value: string | number) {
     setForm((prev) => {
       const next = { ...prev };
-      if (key === "currentStock") next.currentStock = Number(value);
-      else if (key === "purchasePrice") next.purchasePrice = Number(value);
-      else (next as Record<string, string | number>)[key] = value;
+      if (key === "currentStock" || key === "minimumStock" || key === "purchasePrice" || key === "sellingPrice" || key === "mrp") {
+        next[key] = Number(value);
+      } else {
+        (next as Record<string, string | number>)[key] = value;
+      }
       return next;
     });
   }
 
+  function changeCategory(next: Product["category"]) {
+    setForm((prev) => (editing ? mergeCategoryChange(prev, next) : emptyProduct(next)));
+  }
+
   async function saveProduct(e: React.FormEvent) {
     e.preventDefault();
-    const validationError = validateInventoryForm(form);
+    const validationError = validateInventoryForm(form, canViewCost);
     if (validationError) return toast.error(validationError);
     setSaving(true);
     try {
@@ -244,19 +266,25 @@ export function Inventory({ embedded = false }: { embedded?: boolean }) {
 
       {showForm && canManageInventory && (
         <Card>
-          <h2 className="mb-1 text-lg font-semibold">{editing ? "Edit Product" : "Add to Inventory"}</h2>
+          <h2 className="mb-1 text-lg font-semibold">{editing ? "Edit product" : "Add product"}</h2>
           <p className="mb-4 text-sm text-cream/60">
-            {editing ? "Update quantity, price, or color. Category cannot change while editing." : productDisplayLabel(form) || "Fields change based on category"}
+            {editing
+              ? `Editing ${editing.productId} — change any field including category, prices, and stock.`
+              : productDisplayLabel(form) || "Fields change based on category"}
           </p>
           <form onSubmit={saveProduct} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {editing && (
+              <Field label="Product ID">
+                <input className={inputClass} value={editing.productId} readOnly disabled />
+              </Field>
+            )}
             <Field label="Category">
               <select
                 className={inputClass}
                 value={form.category}
-                disabled={!!editing}
-                onChange={(e) => setForm(emptyProduct(e.target.value as Product["category"]))}
+                onChange={(e) => changeCategory(e.target.value as Product["category"])}
               >
-                {ACTIVE_PRODUCT_CATEGORIES.map((c) => (
+                {[...new Set([...PRODUCT_CATEGORIES, form.category])].map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>

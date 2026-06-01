@@ -88,6 +88,16 @@ router.get("/low-stock", protect, async (req, res, next) => {
   }
 });
 
+router.get("/:id", protect, async (req, res, next) => {
+  try {
+    const item = await InventoryItem.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: "Product not found" });
+    res.json({ item: serializeInventoryItem(item, req.user?.role) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post("/", protect, writeRoles, async (req, res, next) => {
   try {
     const settings = await getShopSettings();

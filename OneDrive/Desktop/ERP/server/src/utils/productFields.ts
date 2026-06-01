@@ -44,6 +44,7 @@ export type FieldKey =
   | "strapType"
   | "watchDisplay"
   | "currentStock"
+  | "minimumStock"
   | "quantity"
   | "purchasePrice"
   | "sellingPrice"
@@ -61,6 +62,7 @@ export type FieldDef = {
 
 export function getInventoryFieldDefs(category: string, colorOptions: readonly string[] = DEFAULT_PRODUCT_COLORS): FieldDef[] {
   const c = normalizeCategory(category);
+  const stockAlertField = { key: "minimumStock" as const, label: "Low stock alert at", type: "number" as const, required: true };
 
   if (c === WALL_CLOCK_CATEGORY) {
     return [
@@ -68,6 +70,7 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "modelNumber", label: "Model number", type: "text", required: true },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
       { key: "colorVariant", label: "Colors", type: "multiColor", options: colorOptions, required: true },
+      stockAlertField,
       { key: "mrp", label: "MRP ₹", type: "number", required: true },
       { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
@@ -80,6 +83,8 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "modelNumber", label: "Model", type: "text", required: true },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
       { key: "colorVariant", label: "Color", type: "select", options: colorOptions, required: true },
+      stockAlertField,
+      { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
     ];
   }
@@ -90,6 +95,8 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "modelNumber", label: "Model", type: "text", required: true },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
       { key: "colorVariant", label: "Variant", type: "select", options: TRIMMER_VARIANTS, required: true },
+      stockAlertField,
+      { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
     ];
   }
@@ -99,6 +106,8 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "brand", label: "Brand", type: "text", required: true },
       { key: "modelNumber", label: "Model", type: "text", required: true },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
+      stockAlertField,
+      { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
     ];
   }
@@ -108,6 +117,8 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "brand", label: "Company", type: "text", required: true },
       { key: "batteryType", label: "Battery number", type: "text", required: true, placeholder: "e.g. CR2032, LR44" },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
+      stockAlertField,
+      { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
     ];
   }
@@ -117,6 +128,7 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "accessoryType", label: "Accessory type", type: "select", options: ACCESSORY_TYPES, required: true },
       { key: "brand", label: "Brand", type: "text", required: true },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
+      stockAlertField,
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true },
       { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true }
     ];
@@ -126,6 +138,8 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
     { key: "brand", label: "Brand", type: "text", required: true },
     { key: "modelNumber", label: "Model", type: "text" },
     { key: "currentStock", label: "Quantity", type: "number", required: true },
+    stockAlertField,
+    { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
     { key: "purchasePrice", label: "Cost price ₹", type: "number", adminOnly: true }
   ];
 }
@@ -150,7 +164,8 @@ export function joinColors(colors: string[]): string {
 export function parseProductBody(body: Record<string, unknown>): ProductPayload {
   const category = normalizeCategory(String(body.category || "")) as ProductCategory;
   const purchasePrice = Number(body.purchasePrice ?? 0);
-  const sellingPrice = Number(body.sellingPrice ?? 0) || purchasePrice;
+  const explicitSell = Number(body.sellingPrice ?? 0);
+  const sellingPrice = explicitSell > 0 ? explicitSell : purchasePrice;
   const mrp = Number(body.mrp ?? 0) || sellingPrice;
 
   let colorVariant = String(body.colorVariant || "").trim();
@@ -164,7 +179,7 @@ export function parseProductBody(body: Record<string, unknown>): ProductPayload 
     modelNumber: String(body.modelNumber || body.accessoryName || "").trim(),
     colorVariant,
     purchasePrice,
-    sellingPrice: category === WALL_CLOCK_CATEGORY || category === ACCESSORY_CATEGORY ? sellingPrice : purchasePrice,
+    sellingPrice,
     mrp: category === WALL_CLOCK_CATEGORY ? mrp : sellingPrice,
     currentStock: Number(body.currentStock ?? 0),
     minimumStock: Number(body.minimumStock ?? 5),
@@ -206,12 +221,18 @@ export function validateProductPayload(data: ProductPayload, colorOptions?: read
 
   if (data.purchasePrice < 0) errors.push("Cost price cannot be negative");
   if (data.currentStock < 0) errors.push("Quantity cannot be negative");
+  if (data.minimumStock < 0) errors.push("Low stock alert level cannot be negative");
+
+  const costRequired = getInventoryFieldDefs(data.category, colorOptions).some((f) => f.key === "purchasePrice" && f.required && f.adminOnly);
+  if (costRequired && data.purchasePrice <= 0) errors.push("Cost price is required");
+
   return errors;
 }
 
 function fieldValue(data: ProductPayload, key: FieldKey): string | number {
   if (key === "quantity") return data.currentStock;
   if (key === "currentStock") return data.currentStock;
+  if (key === "minimumStock") return data.minimumStock;
   if (key === "purchasePrice") return data.purchasePrice;
   if (key === "sellingPrice") return data.sellingPrice;
   if (key === "mrp") return data.mrp;

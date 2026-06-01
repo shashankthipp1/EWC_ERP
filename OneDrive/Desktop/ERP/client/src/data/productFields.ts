@@ -17,6 +17,8 @@ import {
   WALL_CLOCK_CATEGORY
 } from "./categories";
 
+const stockAlertField = { key: "minimumStock" as const, label: "Low stock alert at", type: "number" as const, required: true };
+
 export type FieldKey =
   | "brand"
   | "modelNumber"
@@ -26,6 +28,7 @@ export type FieldKey =
   | "strapType"
   | "watchDisplay"
   | "currentStock"
+  | "minimumStock"
   | "purchasePrice"
   | "sellingPrice"
   | "mrp"
@@ -93,6 +96,7 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "modelNumber", label: "Model number", type: "text", required: true },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
       { key: "colorVariant", label: "Colors", type: "multiColor", options: colors, required: true },
+      stockAlertField,
       { key: "mrp", label: "MRP ₹", type: "number", required: true },
       { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
@@ -104,6 +108,8 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "modelNumber", label: "Model", type: "text", required: true },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
       { key: "colorVariant", label: "Color", type: "select", options: colors, required: true },
+      stockAlertField,
+      { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
     ];
   }
@@ -113,6 +119,8 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "modelNumber", label: "Model", type: "text", required: true },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
       { key: "colorVariant", label: "Variant", type: "select", options: TRIMMER_VARIANTS, required: true },
+      stockAlertField,
+      { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
     ];
   }
@@ -121,6 +129,8 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "brand", label: "Brand", type: "text", required: true },
       { key: "modelNumber", label: "Model", type: "text", required: true },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
+      stockAlertField,
+      { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
     ];
   }
@@ -129,6 +139,8 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "brand", label: "Company", type: "text", required: true },
       { key: "batteryType", label: "Battery number", type: "text", required: true, placeholder: "e.g. CR2032" },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
+      stockAlertField,
+      { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true }
     ];
   }
@@ -137,6 +149,7 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
       { key: "accessoryType", label: "Accessory type", type: "select", options: ACCESSORY_TYPES, required: true },
       { key: "brand", label: "Brand", type: "text", required: true },
       { key: "currentStock", label: "Quantity", type: "number", required: true },
+      stockAlertField,
       { key: "purchasePrice", label: "Cost price ₹", type: "number", required: true, adminOnly: true },
       { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true }
     ];
@@ -145,8 +158,30 @@ export function getInventoryFieldDefs(category: string, colorOptions: readonly s
     { key: "brand", label: "Brand", type: "text", required: true },
     { key: "modelNumber", label: "Model", type: "text" },
     { key: "currentStock", label: "Quantity", type: "number", required: true },
+    stockAlertField,
+    { key: "sellingPrice", label: "Selling price ₹", type: "number", required: true },
     { key: "purchasePrice", label: "Cost price ₹", type: "number", adminOnly: true }
   ];
+}
+
+/** When changing category while editing, keep shared values where possible */
+export function mergeCategoryChange(prev: ProductFormValues, nextCategory: ProductCategory): ProductFormValues {
+  const c = normalizeCategory(nextCategory);
+  const blank = emptyProduct(nextCategory);
+  return {
+    ...blank,
+    brand: prev.brand,
+    modelNumber: c === ACCESSORY_CATEGORY ? "" : prev.modelNumber,
+    colorVariant: categoryOmitsColorField(c) ? "" : prev.colorVariant,
+    batteryType: isBatteryCategory(c) ? prev.batteryType : "",
+    accessoryType: c === ACCESSORY_CATEGORY ? prev.accessoryType : "",
+    currentStock: prev.currentStock,
+    minimumStock: prev.minimumStock,
+    purchasePrice: prev.purchasePrice,
+    sellingPrice: prev.sellingPrice || prev.purchasePrice,
+    mrp: prev.mrp || prev.sellingPrice,
+    supplierName: prev.supplierName
+  };
 }
 
 export function getOrderFieldDefs(category: string, colorOptions: readonly string[] = []): FieldDef[] {
@@ -253,15 +288,16 @@ export function orderLineFromProduct(item: {
 function fieldValue(values: ProductFormValues | OrderLineValues, key: FieldKey): string | number {
   if (key === "quantity") return "quantity" in values ? values.quantity : 0;
   if (key === "currentStock") return "currentStock" in values ? values.currentStock : 0;
+  if (key === "minimumStock") return "minimumStock" in values ? values.minimumStock : 5;
   if (key === "purchasePrice") return values.purchasePrice ?? 0;
   if (key === "sellingPrice") return "sellingPrice" in values ? values.sellingPrice : 0;
   if (key === "mrp") return "mrp" in values ? values.mrp : 0;
   return (values as Record<string, string | number>)[key] ?? "";
 }
 
-export function validateInventoryForm(values: ProductFormValues): string | null {
+export function validateInventoryForm(values: ProductFormValues, includeAdminFields = false): string | null {
   for (const field of getInventoryFieldDefs(values.category)) {
-    if (field.adminOnly || !field.required) continue;
+    if ((field.adminOnly && !includeAdminFields) || !field.required) continue;
     const v = fieldValue(values, field.key);
     if (field.type === "multiColor") {
       if (!parseColorsFromVariant(String(v)).length) return `${field.label} is required`;
@@ -273,6 +309,11 @@ export function validateInventoryForm(values: ProductFormValues): string | null 
     if (values.mrp <= 0) return "MRP is required";
     if (values.sellingPrice <= 0) return "Selling price is required";
   }
+  if (includeAdminFields) {
+    const costRequired = getInventoryFieldDefs(values.category).some((f) => f.key === "purchasePrice" && f.required && f.adminOnly);
+    if (costRequired && (values.purchasePrice ?? 0) <= 0) return "Cost price is required";
+  }
+  if (values.minimumStock < 0) return "Low stock alert level cannot be negative";
   return null;
 }
 
@@ -289,12 +330,12 @@ export function validateOrderLine(values: OrderLineValues): string | null {
 
 export function toInventoryPayload(values: ProductFormValues) {
   const c = normalizeCategory(values.category);
+  const sell = values.sellingPrice > 0 ? values.sellingPrice : values.purchasePrice;
   return {
     ...values,
     category: c === LEGACY_BATTERY_CATEGORY ? BATTERY_CATEGORY : values.category,
-    sellingPrice:
-      c === WALL_CLOCK_CATEGORY || c === ACCESSORY_CATEGORY ? values.sellingPrice : values.purchasePrice || values.sellingPrice,
-    mrp: c === WALL_CLOCK_CATEGORY ? values.mrp : values.sellingPrice,
+    sellingPrice: c === WALL_CLOCK_CATEGORY || c === ACCESSORY_CATEGORY ? values.sellingPrice : sell,
+    mrp: c === WALL_CLOCK_CATEGORY ? values.mrp : sell,
     colorVariant: categoryOmitsColorField(c) ? "" : values.colorVariant,
     batteryType: isBatteryCategory(c) ? values.batteryType : "",
     accessoryType: c === ACCESSORY_CATEGORY ? values.accessoryType : "",
