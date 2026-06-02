@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Download, IndianRupee, Package, ReceiptText } from "lucide-react";
+import { AlertTriangle, Download, IndianRupee, Package, Plus, ReceiptText, ScanLine } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import { Card, PageShell, Skeleton } from "../components/ui";
@@ -50,40 +50,58 @@ export function EwcDashboard() {
     <PageShell className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm text-muted">Dashboard</p>
+          <p className="text-sm text-muted">Today Overview</p>
           <h2 className="font-display text-2xl font-bold text-cream">Welcome, Admin</h2>
         </div>
-        <button
-          type="button"
-          className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-brand/25 bg-brand px-4 text-sm font-semibold text-white shadow-soft"
-        >
-          <Download size={16} />
-          Download Report
-        </button>
+        <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-xs text-muted">
+          <span>01 Jun 2026 - 01 Jun 2026</span>
+          <button
+            type="button"
+            className="inline-flex min-h-[32px] items-center gap-2 rounded-md bg-brand px-3 text-xs font-semibold text-white shadow-soft"
+          >
+            <Download size={14} />
+            Download Report
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="!p-4">
-          <p className="text-xs text-muted">Total Sales</p>
-          <p className="mt-1 text-2xl font-bold text-[#0f4fd8]">{currency(analytics.today.salesValue)}</p>
-          <p className="mt-1 text-xs text-muted">Today Sale</p>
+        <Card className="!rounded-xl !border-0 !bg-[#e8f0ff] !p-4">
+          <p className="text-xs font-semibold text-[#2f4f88]">Total Sales</p>
+          <p className="mt-1 text-2xl font-bold text-[#1659d8]">{currency(analytics.today.salesValue)}</p>
+          <p className="mt-1 text-xs text-[#2f4f88]">Today Sale</p>
         </Card>
-        <Card className="!p-4">
-          <p className="text-xs text-muted">Total Profit</p>
-          <p className="mt-1 text-2xl font-bold text-success">{currency(analytics.comparisons.monthVsLastMonth.thisMonth)}</p>
-          <p className="mt-1 text-xs text-muted">This Month</p>
+        <Card className="!rounded-xl !border-0 !bg-[#e8f9ef] !p-4">
+          <p className="text-xs font-semibold text-[#2b6f4b]">Total Profit</p>
+          <p className="mt-1 text-2xl font-bold text-[#0f9d58]">{currency(analytics.comparisons.monthVsLastMonth.thisMonth)}</p>
+          <p className="mt-1 text-xs text-[#2b6f4b]">This Month</p>
         </Card>
-        <Card className="!p-4">
-          <p className="text-xs text-muted">Total Products</p>
-          <p className="mt-1 text-2xl font-bold text-[#4f46e5]">{analytics.counts.totalProducts}</p>
-          <p className="mt-1 text-xs text-muted">In Inventory</p>
+        <Card className="!rounded-xl !border-0 !bg-[#edf2ff] !p-4">
+          <p className="text-xs font-semibold text-[#4b4aa3]">Total Products</p>
+          <p className="mt-1 text-2xl font-bold text-[#6a5cf6]">{analytics.counts.totalProducts}</p>
+          <p className="mt-1 text-xs text-[#4b4aa3]">In Inventory</p>
         </Card>
-        <Card className="!p-4">
-          <p className="text-xs text-muted">Low Stock</p>
-          <p className="mt-1 text-2xl font-bold text-warning">{analytics.counts.lowStockCount}</p>
-          <p className="mt-1 text-xs text-muted">Need Restock</p>
+        <Card className="!rounded-xl !border-0 !bg-[#fff3e8] !p-4">
+          <p className="text-xs font-semibold text-[#8b5b2e]">Low Stock</p>
+          <p className="mt-1 text-2xl font-bold text-[#f59e0b]">{analytics.counts.lowStockCount}</p>
+          <p className="mt-1 text-xs text-[#8b5b2e]">Need Restock</p>
         </Card>
       </div>
+
+      <Card className="!p-4">
+        <p className="mb-2 text-sm font-semibold text-muted">Quick Actions</p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <Link to="/billing" className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg bg-brand px-3 text-sm font-semibold text-white">
+            <ScanLine size={16} /> + New Bill
+          </Link>
+          <Link to="/inventory" className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg border border-line bg-surface-2 px-3 text-sm font-semibold text-cream">
+            <Package size={16} /> Inventory
+          </Link>
+          <Link to="/sales" className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg border border-line bg-surface-2 px-3 text-sm font-semibold text-cream">
+            <Plus size={16} /> Sales Report
+          </Link>
+        </div>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-[1.8fr_1.2fr]">
         <Card className="!p-5">

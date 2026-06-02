@@ -18,6 +18,14 @@ export function PaymentBar({ value, onChange }: Props) {
     <div className="grid grid-cols-4 gap-2">
       {MODES.map((m) => {
         const on = value === m.id;
+        const activeTone =
+          m.id === "Cash"
+            ? "border-success bg-success text-white"
+            : m.id === "UPI"
+              ? "border-accent bg-accent text-white"
+              : m.id === "Card"
+                ? "border-brand bg-brand text-white"
+                : "border-warning bg-warning text-white";
         return (
           <button
             key={m.id}
@@ -25,7 +33,7 @@ export function PaymentBar({ value, onChange }: Props) {
             onClick={() => onChange(m.id)}
             className={clsx(
               "flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl border text-xs font-bold transition active:scale-[0.97]",
-              on ? "border-brand bg-brand text-navy shadow-glow" : "border-line bg-surface-2 text-muted"
+              on ? `${activeTone} shadow-soft` : "border-line bg-surface-2 text-muted"
             )}
           >
             <m.icon size={20} />

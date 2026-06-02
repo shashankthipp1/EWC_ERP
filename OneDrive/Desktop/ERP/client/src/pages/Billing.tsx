@@ -176,7 +176,7 @@ export function Billing() {
         <p className="text-sm text-muted">Search products, add quantity, and finish bill like POS interface.</p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px]">
+      <div className="grid gap-4 lg:grid-cols-[1fr_390px] xl:grid-cols-[1fr_430px]">
         <div className="flex min-h-0 flex-col gap-3">
           <div className="flex items-center gap-2 rounded-2xl border border-line bg-white p-2 shadow-soft">
             <Search className="ml-2 shrink-0 text-muted" size={22} />
@@ -189,26 +189,32 @@ export function Billing() {
             />
           </div>
 
-          <CategoryBar active={category} onChange={setCategory} />
-
-          <div className="grid max-h-[min(52vh,520px)] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-            {items.map((item) => (
-              <button
-                key={item._id}
-                type="button"
-                onClick={() => pick(item)}
-                disabled={item.currentStock < 1}
-                className="flex flex-col rounded-xl border border-line bg-white p-3 text-left shadow-soft transition hover:border-brand/50 active:scale-[0.98] disabled:opacity-40"
-              >
-                <p className="line-clamp-2 text-sm font-bold leading-snug">{productLabel(item)}</p>
-                <p className="mt-0.5 text-[10px] text-muted">{item.category}</p>
-                <div className="mt-auto flex items-end justify-between gap-1 pt-2">
-                  <span className="text-lg font-bold text-brand">{currency(item.sellingPrice)}</span>
-                  <StockBadge current={item.currentStock} minimum={item.minimumStock} />
-                </div>
-              </button>
-            ))}
-            {!items.length && <p className="col-span-full py-8 text-center text-sm text-muted">No products in this category</p>}
+          <div className="grid min-h-0 gap-3 lg:grid-cols-[138px_1fr]">
+            <div className="rounded-2xl border border-line bg-white p-2 shadow-soft">
+              <CategoryBar active={category} onChange={setCategory} vertical />
+            </div>
+            <div className="grid max-h-[min(58vh,560px)] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 xl:grid-cols-4">
+              {items.map((item) => (
+                <button
+                  key={item._id}
+                  type="button"
+                  onClick={() => pick(item)}
+                  disabled={item.currentStock < 1}
+                  className="flex flex-col rounded-xl border border-line bg-white p-3 text-left shadow-soft transition hover:border-brand/50 active:scale-[0.98] disabled:opacity-40"
+                >
+                  <div className="mb-2 grid h-16 place-items-center rounded-lg bg-surface-2">
+                    <span className="text-xs font-semibold text-muted">{item.category.split(" ")[0]}</span>
+                  </div>
+                  <p className="line-clamp-2 text-sm font-bold leading-snug">{productLabel(item)}</p>
+                  <p className="mt-0.5 text-[10px] text-muted">{item.category}</p>
+                  <div className="mt-auto flex items-end justify-between gap-1 pt-2">
+                    <span className="text-lg font-bold text-brand">{currency(item.sellingPrice)}</span>
+                    <StockBadge current={item.currentStock} minimum={item.minimumStock} />
+                  </div>
+                </button>
+              ))}
+              {!items.length && <p className="col-span-full py-8 text-center text-sm text-muted">No products in this category</p>}
+            </div>
           </div>
         </div>
 
@@ -217,7 +223,7 @@ export function Billing() {
             <ReceiptText className="text-brand" size={24} />
             <div>
               <p className="font-bold">Bill summary</p>
-              <p className="text-xs text-muted">{cart.length} items — edit rates below</p>
+              <p className="text-xs text-muted">Current Bill</p>
             </div>
           </div>
 
@@ -351,7 +357,7 @@ export function Billing() {
                   <span>-{currency(discount)}</span>
                 </div>
               )}
-              <div className="mt-1 flex justify-between text-lg font-bold text-brand">
+              <div className="mt-2 flex justify-between text-xl font-bold text-success">
                 <span>Total</span>
                 <span>{currency(total)}</span>
               </div>
@@ -377,16 +383,16 @@ export function Billing() {
 
             {lastBill && (
               <div className="grid grid-cols-2 gap-2">
-                <Button variant="secondary" size="sm" className="!min-h-[44px]" onClick={() => printInvoice(lastBill, true)}>
+                <Button variant="secondary" size="sm" className="!min-h-[44px] !bg-success !text-white" onClick={() => printInvoice(lastBill, true)}>
                   <Printer size={16} /> Print
                 </Button>
-                <Button variant="secondary" size="sm" className="!min-h-[44px]" onClick={() => downloadInvoicePdf(lastBill)}>
+                <Button variant="secondary" size="sm" className="!min-h-[44px] !bg-brand !text-white" onClick={() => downloadInvoicePdf(lastBill)}>
                   PDF
                 </Button>
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="col-span-2 !min-h-[44px] !border-success/40 !text-success"
+                  className="col-span-2 !min-h-[44px] !border-success/40 !bg-white !text-success"
                   onClick={() => shareWhatsApp(lastBill, customer.phone || undefined)}
                 >
                   <MessageCircle size={18} /> Share on WhatsApp

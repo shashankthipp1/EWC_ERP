@@ -9,8 +9,8 @@ import { Badge, Button } from "../ui";
 
 const dockPrimary = [
   { to: "/", label: "Home", icon: LayoutDashboard, end: true },
-  { to: "/inventory", label: "Stock", icon: Package },
-  { to: "/billing", label: "Bill", icon: ScanLine },
+  { to: "/inventory", label: "Inventory", icon: Package },
+  { to: "/billing", label: "Billing", icon: ScanLine },
   { to: "/sales", label: "Sales", icon: ReceiptText }
 ] as const;
 
@@ -57,7 +57,7 @@ export function MobileDock({ menuOpen, onMenuOpen, onMenuClose }: Props) {
           ))}
           <button type="button" onClick={onMenuOpen} className="flex min-h-[56px] flex-col items-center justify-center text-[11px] font-bold text-muted">
             <MoreHorizontal size={24} />
-            More
+            Menu
           </button>
         </div>
       </nav>
