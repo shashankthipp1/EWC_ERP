@@ -363,11 +363,17 @@ export function inventoryToOrderLine(item: ProductPayload & { _id?: string }) {
 
 export function normalizeOrderItem(raw: Record<string, unknown>) {
   const category = normalizeCategory(String(raw.category || "Wall Clocks"));
-  const quantity = Number(raw.quantity ?? raw.currentStock ?? 1);
+  const quantity = Math.max(1, Math.floor(Number(raw.quantity ?? raw.currentStock ?? 1) || 1));
+  const rawColorVariant = String(raw.colorVariant || "").trim();
+  const parsedColors = parseColorsFromVariant(rawColorVariant);
+  const normalizedColorVariant =
+    category === WALL_CLOCK_CATEGORY && quantity > 1 && parsedColors.length
+      ? joinColors(Array.from({ length: quantity }, (_, idx) => parsedColors[idx] || parsedColors[idx % parsedColors.length]))
+      : rawColorVariant;
   const data = {
     brand: String(raw.brand || "").trim(),
     modelNumber: String(raw.modelNumber || raw.accessoryName || "").trim(),
-    colorVariant: String(raw.colorVariant || "").trim(),
+    colorVariant: normalizedColorVariant,
     batteryType: String(raw.batteryType || "").trim(),
     accessoryType: String(raw.accessoryType || "").trim(),
     purchasePrice: Number(raw.purchasePrice ?? 0)

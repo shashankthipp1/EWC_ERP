@@ -88,14 +88,43 @@ function CompactField({
 export function OrderLineCompactFields({ line, colorOptions, onChange }: Props) {
   const fields = getOrderFieldDefs(line.category, colorOptions).filter((f) => f.key !== "quantity");
   const values = formValuesForFields(line);
+  const selectedUnitColors = parseColorsFromVariant(line.colorVariant);
+  const selectableColors = colorSelectOptions(String(values.colorVariant || ""), colorOptions);
+
+  function setUnitColor(index: number, color: string) {
+    const next = Array.from({ length: Math.max(1, line.quantity) }, (_, i) => selectedUnitColors[i] || selectedUnitColors[0] || "");
+    next[index] = color;
+    onChange("colorVariant", next.filter(Boolean).join(" | "));
+  }
 
   return (
     <div className="flex flex-wrap items-end gap-2">
       {fields.map((field) => (
         <CompactField key={field.key} field={field} values={values} colorOptions={colorOptions} onChange={onChange} />
       ))}
-      {line.category === "Wall Clocks" && line.quantity > 1 && parseColorsFromVariant(line.colorVariant).length > 1 && (
-        <span className="self-center text-[10px] text-muted">({line.quantity} units)</span>
+      {line.category === "Wall Clocks" && line.quantity > 1 && (
+        <div className="w-full rounded-lg border border-line/70 bg-surface-2/50 p-2">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Color split (per unit)</p>
+          <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: line.quantity }).map((_, idx) => (
+              <label key={idx} className="flex items-center gap-2 text-[11px]">
+                <span className="w-8 shrink-0 text-muted">#{idx + 1}</span>
+                <select
+                  className={compactInputClass}
+                  value={selectedUnitColors[idx] || selectedUnitColors[0] || ""}
+                  onChange={(e) => setUnitColor(idx, e.target.value)}
+                >
+                  <option value="">Color</option>
+                  {selectableColors.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

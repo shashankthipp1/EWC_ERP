@@ -75,6 +75,14 @@ export type OrderLineValues = {
   purchasePrice: number;
 };
 
+function expandColorsToQuantity(value: string, quantity: number): string {
+  const qty = Math.max(1, Math.floor(Number(quantity) || 1));
+  const source = parseColorsFromVariant(value);
+  if (!source.length) return "";
+  const colors = Array.from({ length: qty }, (_, i) => source[i % source.length]);
+  return joinColors(colors);
+}
+
 export function parseColorsFromVariant(value: string): string[] {
   return value
     .split(/[|,]/)
@@ -270,17 +278,20 @@ export function orderLineFromProduct(item: {
   currentStock: number;
   minimumStock: number;
 }): OrderLineValues {
+  const quantity = Math.max(1, item.minimumStock * 2 - item.currentStock);
+  const expandedColors =
+    normalizeCategory(item.category) === WALL_CLOCK_CATEGORY ? expandColorsToQuantity(item.colorVariant, quantity) : item.colorVariant;
   return {
     category: item.category,
     brand: item.brand,
     modelNumber: item.modelNumber,
-    colorVariant: item.colorVariant,
+    colorVariant: expandedColors,
     batteryType: item.batteryType,
     accessoryType: item.accessoryType || "",
     accessoryName: "",
     strapType: "",
     watchDisplay: "",
-    quantity: Math.max(1, item.minimumStock * 2 - item.currentStock),
+    quantity,
     purchasePrice: item.purchasePrice ?? 0
   };
 }
@@ -324,6 +335,13 @@ export function validateOrderLine(values: OrderLineValues): string | null {
     if (field.type === "multiColor" && !parseColorsFromVariant(String(v)).length) return `${field.label} is required`;
     if (v === "") return `${field.label} is required`;
     if (field.type === "number" && field.key === "quantity" && Number(v) <= 0) return "Quantity must be at least 1";
+  }
+  const normalizedCategory = normalizeCategory(values.category);
+  if (normalizedCategory === WALL_CLOCK_CATEGORY && values.quantity > 1) {
+    const colors = parseColorsFromVariant(values.colorVariant);
+    if (colors.length !== values.quantity) {
+      return `Select exactly ${values.quantity} colors (one per unit)`;
+    }
   }
   return null;
 }

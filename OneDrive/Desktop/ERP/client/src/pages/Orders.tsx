@@ -13,10 +13,13 @@ import {
   FieldKey,
   OrderLineValues,
   emptyOrderLine,
+  joinColors,
   orderLineFromProduct,
   orderLineToPayload,
+  parseColorsFromVariant,
   validateOrderLine
 } from "../data/productFields";
+import { normalizeCategory, WALL_CLOCK_CATEGORY } from "../data/categories";
 import { Product } from "../types/product";
 import { ShopHeader } from "../utils/exporters";
 import { currency, productLabel } from "../utils/format";
@@ -77,9 +80,44 @@ export function Orders() {
     return () => window.clearTimeout(t);
   }, [invSearch]);
 
+  function lineMergeKey(line: OrderLineValues) {
+    return [
+      normalizeCategory(line.category),
+      line.brand.trim().toLowerCase(),
+      line.modelNumber.trim().toLowerCase(),
+      line.batteryType.trim().toLowerCase(),
+      line.accessoryType.trim().toLowerCase(),
+      Number(line.purchasePrice || 0)
+    ].join("|");
+  }
+
+  function expandWallClockColors(value: string, quantity: number) {
+    const colors = parseColorsFromVariant(value);
+    if (!colors.length) return "";
+    return joinColors(Array.from({ length: Math.max(1, quantity) }, (_, idx) => colors[idx] || colors[idx % colors.length]));
+  }
+
+  function upsertOrderLine(incoming: OrderLineValues) {
+    setOrderItems((old) => {
+      const existingIndex = old.findIndex((line) => lineMergeKey(line) === lineMergeKey(incoming));
+      if (existingIndex < 0) return [...old, incoming];
+
+      const current = old[existingIndex];
+      const nextQty = current.quantity + incoming.quantity;
+      const isWallClock = normalizeCategory(current.category) === WALL_CLOCK_CATEGORY;
+      const mergedColors = isWallClock
+        ? expandWallClockColors(joinColors([...parseColorsFromVariant(current.colorVariant), ...parseColorsFromVariant(incoming.colorVariant)]), nextQty)
+        : current.colorVariant || incoming.colorVariant;
+
+      const updated = [...old];
+      updated[existingIndex] = { ...current, quantity: nextQty, colorVariant: mergedColors };
+      return updated;
+    });
+  }
+
   function pick(item: Product) {
-    setOrderItems((old) => [...old, orderLineFromProduct(item)]);
-    toast.success("Added");
+    upsertOrderLine(orderLineFromProduct(item));
+    toast.success("Added to order list");
   }
 
   function addManualLine() {
@@ -94,6 +132,9 @@ export function Orders() {
         if (key === "quantity") next.quantity = Number(value);
         else if (key === "purchasePrice") next.purchasePrice = Number(value);
         else (next as Record<string, string | number>)[key] = value;
+        if (normalizeCategory(next.category) === WALL_CLOCK_CATEGORY && key === "quantity") {
+          next.colorVariant = expandWallClockColors(next.colorVariant, next.quantity);
+        }
         return next;
       })
     );
@@ -105,6 +146,72 @@ export function Orders() {
 
   function removeLine(index: number) {
     setOrderItems((rows) => rows.filter((_, i) => i !== index));
+  }
+
+  function splitWallClockLinesByColor() {
+    setOrderItems((rows) => {
+      const next: OrderLineValues[] = [];
+      let changed = false;
+
+      for (const line of rows) {
+        if (normalizeCategory(line.category) !== WALL_CLOCK_CATEGORY || line.quantity <= 1) {
+          next.push(line);
+          continue;
+        }
+
+        const colors = parseColorsFromVariant(line.colorVariant);
+        if (!colors.length) {
+          next.push(line);
+          continue;
+        }
+
+        const colorCount = new Map<string, number>();
+        colors.slice(0, line.quantity).forEach((color) => {
+          colorCount.set(color, (colorCount.get(color) || 0) + 1);
+        });
+
+        if (colorCount.size <= 1) {
+          next.push(line);
+          continue;
+        }
+
+        changed = true;
+        colorCount.forEach((qty, color) => {
+          next.push({
+            ...line,
+            quantity: qty,
+            colorVariant: color
+          });
+        });
+      }
+
+      if (!changed) {
+        toast("No mixed-color wall clock lines to split", { icon: "ℹ️" });
+        return rows;
+      }
+      toast.success("Split by color completed");
+      return next;
+    });
+  }
+
+  async function addSuggestion(suggestion: { product: string; suggestedQuantity: number }) {
+    let target = items.find((item) => productLabel(item) === suggestion.product);
+    if (!target) {
+      const { data } = await api.get("/inventory", { params: { q: suggestion.product, limit: 10 } });
+      target = (data.items || []).find((item: Product) => productLabel(item) === suggestion.product) || data.items?.[0];
+    }
+    if (!target) return toast.error("Suggestion item not found");
+
+    const line = orderLineFromProduct(target);
+    const qty = Math.max(1, suggestion.suggestedQuantity);
+    const finalLine = {
+      ...line,
+      quantity: qty,
+      colorVariant:
+        normalizeCategory(line.category) === WALL_CLOCK_CATEGORY ? expandWallClockColors(line.colorVariant, qty) : line.colorVariant
+    };
+    upsertOrderLine(finalLine);
+    toast.success("Suggestion added");
   }
 
   function downloadPdf(lines: OrderLineValues[], orderNumber?: string) {
@@ -187,9 +294,14 @@ export function Orders() {
           <p className="mt-1 text-sm text-muted">Build a clean order list line by line — charts update as you type.</p>
         </div>
         {canManageOrders && (
-          <Button onClick={addManualLine} size="sm">
-            <Plus size={16} /> New line
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={splitWallClockLinesByColor} size="sm">
+              Split by color
+            </Button>
+            <Button onClick={addManualLine} size="sm">
+              <Plus size={16} /> New line
+            </Button>
+          </div>
         )}
       </div>
 
@@ -269,9 +381,14 @@ export function Orders() {
                   <p className="text-[10px] font-bold uppercase text-warning">Low stock — tap to add</p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {suggestions.slice(0, 6).map((s) => (
-                      <span key={s.product} className="rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning">
+                      <button
+                        key={s.product}
+                        type="button"
+                        onClick={() => addSuggestion(s)}
+                        className="rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning hover:bg-warning/25"
+                      >
                         {s.product} ×{s.suggestedQuantity}
-                      </span>
+                      </button>
                     ))}
                   </div>
                 </div>
