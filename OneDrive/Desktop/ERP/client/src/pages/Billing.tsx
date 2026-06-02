@@ -1,5 +1,5 @@
-import { CreditCard, MessageCircle, Minus, Plus, Printer, ReceiptText, Search, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { CreditCard, Keyboard, MessageCircle, Minus, Plus, Printer, ReceiptText, Search, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { api } from "../api/http";
 import { StockBadge } from "../components/ewc/StockBadge";
@@ -20,9 +20,12 @@ type CartItem = Product & {
 
 export function Billing() {
   const { canViewCost } = usePermissions();
+  const searchRef = useRef<HTMLInputElement>(null);
+  const barcodeRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [q, setQ] = useState("");
+  const [scanCode, setScanCode] = useState("");
   const [category, setCategory] = useState("");
   const [customer, setCustomer] = useState({ name: "", phone: "" });
   const [paymentMethod, setPaymentMethod] = useState("Cash");
@@ -31,6 +34,10 @@ export function Billing() {
   const [mixed, setMixed] = useState({ cash: 0, upi: 0, card: 0 });
   const [checkingOut, setCheckingOut] = useState(false);
   const [lastBill, setLastBill] = useState<InvoiceData | null>(null);
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
+  const [showHotkeys, setShowHotkeys] = useState(false);
+  const [barcodeMode, setBarcodeMode] = useState(false);
+  const [scanSound, setScanSound] = useState(true);
 
   const loadProducts = useCallback(async () => {
     const { data } = await api.get("/inventory", {
@@ -59,6 +66,16 @@ export function Billing() {
     if (paymentMethod === "Mixed") setMixed((m) => ({ ...m, cash: total }));
   }, [paymentMethod, total]);
 
+  useEffect(() => {
+    if (!cart.length) {
+      setSelectedLineId(null);
+      return;
+    }
+    if (!selectedLineId || !cart.some((line) => line._id === selectedLineId)) {
+      setSelectedLineId(cart[0]._id);
+    }
+  }, [cart, selectedLineId]);
+
   function pick(item: Product) {
     if (item.currentStock < 1) {
       toast.error("Out of stock");
@@ -83,6 +100,10 @@ export function Billing() {
         }
       ];
     });
+    setSelectedLineId(item._id);
+    if (barcodeMode) {
+      window.setTimeout(() => barcodeRef.current?.focus(), 0);
+    }
   }
 
   function adjustQty(id: string, delta: number) {
@@ -169,21 +190,225 @@ export function Billing() {
     }
   }
 
+  function playScanBeep(success: boolean) {
+    if (!scanSound) return;
+    try {
+      const audioContext = new (window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = success ? 880 : 220;
+      gain.gain.value = 0.03;
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.08);
+    } catch {
+      // Ignore beep failures on unsupported browsers/devices.
+    }
+  }
+
+  async function handleBarcodeSubmit(rawInput: string) {
+    const cleaned = rawInput.trim();
+    if (!cleaned) return;
+
+    let quantity = 1;
+    let code = cleaned;
+    const qtyMatch = cleaned.match(/^(\d+)\s*[*xX]\s*(.+)$/);
+    if (qtyMatch) {
+      quantity = Math.max(1, Number(qtyMatch[1]) || 1);
+      code = qtyMatch[2].trim();
+    }
+
+    const byLocalMatch =
+      items.find((item) => item.productId?.toLowerCase() === code.toLowerCase()) ||
+      items.find((item) => item.productId?.toLowerCase().startsWith(code.toLowerCase()));
+
+    let matched = byLocalMatch;
+    if (!matched) {
+      const { data } = await api.get("/inventory", { params: { q: code, limit: 20 } });
+      const fetched = (data.items || []) as Product[];
+      matched =
+        fetched.find((item) => item.productId?.toLowerCase() === code.toLowerCase()) ||
+        fetched.find((item) => item.productId?.toLowerCase().startsWith(code.toLowerCase())) ||
+        fetched[0];
+    }
+
+    if (!matched) {
+      playScanBeep(false);
+      toast.error(`No item found for code "${code}"`);
+      return;
+    }
+
+    for (let i = 0; i < quantity; i += 1) {
+      pick(matched);
+    }
+    playScanBeep(true);
+    setScanCode("");
+    if (barcodeMode) {
+      window.setTimeout(() => barcodeRef.current?.focus(), 0);
+    }
+  }
+
+  useEffect(() => {
+    function handleHotkeys(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const inField =
+        !!target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
+
+      if (e.key === "F2" || (e.ctrlKey && e.key.toLowerCase() === "b")) {
+        e.preventDefault();
+        if (barcodeMode) {
+          barcodeRef.current?.focus();
+          barcodeRef.current?.select();
+        } else {
+          searchRef.current?.focus();
+          searchRef.current?.select();
+        }
+        return;
+      }
+
+      if (e.key === "F4") {
+        e.preventDefault();
+        setShowHotkeys((s) => !s);
+        return;
+      }
+
+      if (e.ctrlKey && e.key === "Enter") {
+        e.preventDefault();
+        if (cart.length && !checkingOut) {
+          void createBill();
+        }
+        return;
+      }
+
+      if (e.altKey && ["1", "2", "3", "4"].includes(e.key)) {
+        e.preventDefault();
+        const map: Record<string, string> = { "1": "Cash", "2": "UPI", "3": "Card", "4": "Mixed" };
+        setPaymentMethod(map[e.key]);
+        return;
+      }
+
+      if (e.ctrlKey && e.key === "Backspace") {
+        e.preventDefault();
+        setCart([]);
+        setSelectedLineId(null);
+        return;
+      }
+
+      if (!inField && e.key === "Enter" && q.trim() && items[0]) {
+        e.preventDefault();
+        pick(items[0]);
+        return;
+      }
+
+      if (!selectedLineId || inField) return;
+
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        adjustQty(selectedLineId, 1);
+      } else if (e.key === "-") {
+        e.preventDefault();
+        adjustQty(selectedLineId, -1);
+      } else if (e.key === "Delete") {
+        e.preventDefault();
+        removeLine(selectedLineId);
+      }
+    }
+
+    window.addEventListener("keydown", handleHotkeys);
+    return () => window.removeEventListener("keydown", handleHotkeys);
+  }, [cart.length, checkingOut, createBill, items, q, selectedLineId]);
+
   return (
     <PageShell className="pb-28 lg:pb-8">
-      <div className="mb-4">
-        <h1 className="font-display text-2xl font-bold">New Bill</h1>
-        <p className="text-sm text-muted">Search products, add quantity, and finish bill like POS interface.</p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold">New Bill</h1>
+          <p className="text-sm text-muted">Lightning mode: F2 focus, Enter quick-add, Ctrl+Enter checkout.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setBarcodeMode((s) => !s)}
+            className={`inline-flex min-h-[38px] items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${
+              barcodeMode ? "border-success bg-success text-white" : "border-line bg-white text-muted"
+            }`}
+          >
+            Barcode Mode {barcodeMode ? "ON" : "OFF"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setScanSound((s) => !s)}
+            className={`inline-flex min-h-[38px] items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${
+              scanSound ? "border-brand bg-brand/10 text-brand" : "border-line bg-white text-muted"
+            }`}
+          >
+            Scan Beep {scanSound ? "ON" : "OFF"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowHotkeys((s) => !s)}
+            className="inline-flex min-h-[38px] items-center gap-2 rounded-lg border border-line bg-white px-3 text-xs font-semibold text-muted"
+          >
+            <Keyboard size={15} />
+            {showHotkeys ? "Hide shortcuts" : "Show shortcuts"}
+          </button>
+        </div>
       </div>
+
+      {showHotkeys && (
+        <Card className="mb-4 !rounded-xl !p-3">
+          <div className="grid gap-2 text-xs text-muted sm:grid-cols-2 lg:grid-cols-4">
+            <p><strong className="text-cream">F2 / Ctrl+B:</strong> Focus search</p>
+            <p><strong className="text-cream">Enter:</strong> Add first search result</p>
+            <p><strong className="text-cream">+ / -:</strong> Qty up/down (selected row)</p>
+            <p><strong className="text-cream">Delete:</strong> Remove selected row</p>
+            <p><strong className="text-cream">Alt+1..4:</strong> Cash/UPI/Card/Mixed</p>
+            <p><strong className="text-cream">Ctrl+Enter:</strong> Checkout bill</p>
+            <p><strong className="text-cream">Ctrl+Backspace:</strong> Clear cart</p>
+            <p><strong className="text-cream">F4:</strong> Toggle shortcut panel</p>
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_390px] xl:grid-cols-[1fr_430px]">
         <div className="flex min-h-0 flex-col gap-3">
+          {barcodeMode && (
+            <div className="rounded-2xl border border-success/30 bg-success/10 p-2 shadow-soft">
+              <input
+                ref={barcodeRef}
+                className="min-h-[48px] w-full rounded-xl border border-success/30 bg-white px-3 text-base outline-none placeholder:text-muted"
+                value={scanCode}
+                onChange={(e) => setScanCode(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    await handleBarcodeSubmit(scanCode);
+                  }
+                }}
+                placeholder='Scan barcode / product ID (use "3xCODE" for quantity)'
+                autoFocus
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2 rounded-2xl border border-line bg-white p-2 shadow-soft">
             <Search className="ml-2 shrink-0 text-muted" size={22} />
             <input
+              ref={searchRef}
               className="min-h-[48px] flex-1 bg-transparent text-base outline-none placeholder:text-muted"
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && items[0]) {
+                  e.preventDefault();
+                  pick(items[0]);
+                }
+              }}
               placeholder="Search product…"
               autoFocus
             />
@@ -232,7 +457,13 @@ export function Billing() {
               <p className="py-8 text-center text-sm text-muted">Cart is empty — tap a product</p>
             ) : (
               cart.map((line) => (
-                <div key={line._id} className="rounded-lg border border-line bg-surface-2/60 p-2.5">
+                <div
+                  key={line._id}
+                  className={`rounded-lg border p-2.5 ${
+                    selectedLineId === line._id ? "border-brand bg-brand/10" : "border-line bg-surface-2/60"
+                  }`}
+                  onClick={() => setSelectedLineId(line._id)}
+                >
                   <div className="flex items-start justify-between gap-1">
                     <p className="text-sm font-semibold leading-snug">{productLabel(line)}</p>
                     <button type="button" onClick={() => removeLine(line._id)} className="shrink-0 text-danger">

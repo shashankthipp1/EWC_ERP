@@ -6,7 +6,7 @@ import { Card, PageShell, Skeleton } from "../components/ui";
 import { currency, formatDateTime } from "../utils/format";
 
 type Analytics = {
-  today: { salesValue: number; billsCount: number };
+  today: { salesValue: number; billsCount: number; profit?: number };
   comparisons: { monthVsLastMonth: { thisMonth: number } };
   counts: { totalProducts: number; lowStockCount: number; outOfStockCount?: number };
   lowStock: Array<{ name: string; category: string; left: number; minimum: number }>;
@@ -72,9 +72,9 @@ export function EwcDashboard() {
           <p className="mt-1 text-xs text-[#2f4f88]">Today Sale</p>
         </Card>
         <Card className="!rounded-xl !border-0 !bg-[#e8f9ef] !p-4">
-          <p className="text-xs font-semibold text-[#2b6f4b]">Total Profit</p>
-          <p className="mt-1 text-2xl font-bold text-[#0f9d58]">{currency(analytics.comparisons.monthVsLastMonth.thisMonth)}</p>
-          <p className="mt-1 text-xs text-[#2b6f4b]">This Month</p>
+          <p className="text-xs font-semibold text-[#2b6f4b]">Net Profit</p>
+          <p className="mt-1 text-2xl font-bold text-[#0f9d58]">{currency(analytics.today.profit ?? 0)}</p>
+          <p className="mt-1 text-xs text-[#2b6f4b]">Today (after expenses)</p>
         </Card>
         <Card className="!rounded-xl !border-0 !bg-[#edf2ff] !p-4">
           <p className="text-xs font-semibold text-[#4b4aa3]">Total Products</p>
