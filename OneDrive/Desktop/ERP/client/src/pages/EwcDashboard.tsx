@@ -1,12 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, IndianRupee, Package, Plus, ScanLine, TrendingUp, Wallet, XCircle } from "lucide-react";
+import { AlertTriangle, Download, IndianRupee, Package, ReceiptText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../api/http";
-import { QuickAction } from "../components/ewc/QuickActionBar";
-import { SimpleStatCard } from "../components/ewc/SimpleStatCard";
-import { StockBadge } from "../components/ewc/StockBadge";
 import { Card, PageShell, Skeleton } from "../components/ui";
-import { usePermissions } from "../hooks/usePermissions";
 import { currency, formatDateTime } from "../utils/format";
 
 type Analytics = {
@@ -18,8 +14,6 @@ type Analytics = {
 };
 
 export function EwcDashboard() {
-  const { canManageInventory } = usePermissions();
-
   const { data: analytics, isLoading } = useQuery({
     queryKey: ["analytics"],
     queryFn: async () => (await api.get("/analytics")).data as Analytics
@@ -38,71 +32,128 @@ export function EwcDashboard() {
     );
   }
 
-  const outOfStock = analytics.counts.outOfStockCount ?? 0;
+  const salesSeries = analytics.recentSales
+    .slice()
+    .reverse()
+    .slice(0, 7)
+    .map((s) => s.amount);
+  const maxSales = Math.max(...salesSeries, 1);
+  const points = salesSeries
+    .map((amount, index) => {
+      const x = (index / Math.max(salesSeries.length - 1, 1)) * 100;
+      const y = 100 - (amount / maxSales) * 90;
+      return `${x},${y}`;
+    })
+    .join(" ");
 
   return (
-    <PageShell className="space-y-5">
-      <div className="rounded-2xl border border-brand/25 bg-brand/10 p-5">
-        <p className="text-lg font-bold">Shop overview</p>
-        <p className="mt-1 text-sm text-muted">Tap a big button to start billing or add stock.</p>
+    <PageShell className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm text-muted">Dashboard</p>
+          <h2 className="font-display text-2xl font-bold text-cream">Welcome, Admin</h2>
+        </div>
+        <button
+          type="button"
+          className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-brand/25 bg-brand px-4 text-sm font-semibold text-white shadow-soft"
+        >
+          <Download size={16} />
+          Download Report
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <QuickAction to="/billing" icon={ScanLine} label="New bill" primary />
-        <QuickAction to="/finance" icon={Wallet} label="Expenditure" />
-        {canManageInventory && <QuickAction to="/inventory" icon={Plus} label="Add product" />}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <SimpleStatCard
-          icon={IndianRupee}
-          label="Today's sales"
-          value={currency(analytics.today.salesValue)}
-          hint={`${analytics.today.billsCount} bills`}
-          tone="brand"
-        />
-        <SimpleStatCard icon={TrendingUp} label="This month" value={currency(analytics.comparisons.monthVsLastMonth.thisMonth)} tone="success" />
-        <SimpleStatCard icon={Package} label="Total products" value={analytics.counts.totalProducts} />
-        <SimpleStatCard icon={AlertTriangle} label="Low stock" value={analytics.counts.lowStockCount} tone="warning" />
-        <SimpleStatCard icon={XCircle} label="Out of stock" value={outOfStock} tone="danger" />
-      </div>
-
-      {(analytics.lowStock.length > 0 || outOfStock > 0) && (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="!p-4">
-          <h2 className="mb-3 text-base font-bold">Stock alerts</h2>
-          <ul className="space-y-2">
-            {analytics.lowStock.slice(0, 6).map((item) => (
-              <li key={item.name} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
-                <span className="truncate">{item.name}</span>
-                <StockBadge current={item.left} minimum={item.minimum} />
-              </li>
-            ))}
-          </ul>
-          <Link to="/inventory" className="mt-3 inline-block text-sm font-semibold text-brand">
-            Open inventory →
-          </Link>
+          <p className="text-xs text-muted">Total Sales</p>
+          <p className="mt-1 text-2xl font-bold text-[#0f4fd8]">{currency(analytics.today.salesValue)}</p>
+          <p className="mt-1 text-xs text-muted">Today Sale</p>
         </Card>
-      )}
-
-      {analytics.recentSales.length > 0 && (
         <Card className="!p-4">
-          <h2 className="mb-3 text-base font-bold">Recent bills</h2>
-          <ul className="space-y-2">
-            {analytics.recentSales.slice(0, 5).map((sale) => (
-              <li key={sale.billNumber} className="flex justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
-                <div>
-                  <p className="font-mono font-semibold text-brand">{sale.billNumber}</p>
-                  <p className="text-xs text-muted">{formatDateTime(sale.createdAt)}</p>
-                </div>
-                <p className="font-bold">{currency(sale.amount)}</p>
-              </li>
-            ))}
-          </ul>
-          <Link to="/sales" className="mt-3 inline-block text-sm font-semibold text-brand">
-            All sales →
-          </Link>
+          <p className="text-xs text-muted">Total Profit</p>
+          <p className="mt-1 text-2xl font-bold text-success">{currency(analytics.comparisons.monthVsLastMonth.thisMonth)}</p>
+          <p className="mt-1 text-xs text-muted">This Month</p>
         </Card>
-      )}
+        <Card className="!p-4">
+          <p className="text-xs text-muted">Total Products</p>
+          <p className="mt-1 text-2xl font-bold text-[#4f46e5]">{analytics.counts.totalProducts}</p>
+          <p className="mt-1 text-xs text-muted">In Inventory</p>
+        </Card>
+        <Card className="!p-4">
+          <p className="text-xs text-muted">Low Stock</p>
+          <p className="mt-1 text-2xl font-bold text-warning">{analytics.counts.lowStockCount}</p>
+          <p className="mt-1 text-xs text-muted">Need Restock</p>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1.8fr_1.2fr]">
+        <Card className="!p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-base font-bold">Sales Overview</p>
+            <span className="rounded-md border border-line bg-surface-2 px-3 py-1 text-xs text-muted">This Week</span>
+          </div>
+          <div className="h-56 rounded-xl border border-line bg-surface-2 p-3">
+            <svg viewBox="0 0 100 100" className="h-full w-full">
+              <polyline fill="none" stroke="rgba(37,99,235,0.2)" strokeWidth="1.5" points={`0,100 ${points} 100,100`} />
+              <polyline fill="none" stroke="#2563eb" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" points={points} />
+            </svg>
+          </div>
+        </Card>
+
+        <div className="grid gap-4">
+          <Card className="!p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-semibold">Top Selling Products</p>
+              <Package size={18} className="text-muted" />
+            </div>
+            <ul className="space-y-2">
+              {analytics.lowStock.slice(0, 4).map((item) => (
+                <li key={item.name} className="flex items-center justify-between rounded-lg border border-line px-3 py-2">
+                  <span className="truncate text-sm">{item.name}</span>
+                  <span className="text-xs font-semibold text-muted">{item.left} Pcs</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          <Card className="!p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-semibold">Low Stock Alert</p>
+              <AlertTriangle size={18} className="text-warning" />
+            </div>
+            <ul className="space-y-2">
+              {analytics.lowStock.slice(0, 4).map((item) => (
+                <li key={`${item.name}-alert`} className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-sm">
+                  <span className="truncate">{item.name}</span>
+                  <span className="font-semibold text-danger">Stock: {item.left} Pcs</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </div>
+      </div>
+
+      <Card className="!p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ReceiptText size={18} className="text-brand" />
+            <p className="font-semibold">Recent Bills</p>
+          </div>
+          <Link to="/sales" className="text-sm font-semibold text-brand">
+            View All
+          </Link>
+        </div>
+        <div className="grid gap-2">
+          {analytics.recentSales.slice(0, 4).map((sale) => (
+            <div key={sale.billNumber} className="flex items-center justify-between rounded-lg border border-line px-3 py-2.5">
+              <div>
+                <p className="text-sm font-semibold">{sale.billNumber}</p>
+                <p className="text-xs text-muted">{formatDateTime(sale.createdAt)}</p>
+              </div>
+              <p className="font-bold text-brand">{currency(sale.amount)}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
     </PageShell>
   );
 }

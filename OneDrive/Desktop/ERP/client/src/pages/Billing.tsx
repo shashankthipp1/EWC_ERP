@@ -172,13 +172,13 @@ export function Billing() {
   return (
     <PageShell className="pb-28 lg:pb-8">
       <div className="mb-4">
-        <h1 className="font-display text-2xl font-bold">Billing counter</h1>
-        <p className="text-sm text-muted">Tap products — edit sale rate{canViewCost ? " and cost" : ""} in the bill before charging.</p>
+        <h1 className="font-display text-2xl font-bold">New Bill</h1>
+        <p className="text-sm text-muted">Search products, add quantity, and finish bill like POS interface.</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px]">
         <div className="flex min-h-0 flex-col gap-3">
-          <div className="flex items-center gap-2 rounded-2xl border border-line bg-panel p-2">
+          <div className="flex items-center gap-2 rounded-2xl border border-line bg-white p-2 shadow-soft">
             <Search className="ml-2 shrink-0 text-muted" size={22} />
             <input
               className="min-h-[48px] flex-1 bg-transparent text-base outline-none placeholder:text-muted"
@@ -198,7 +198,7 @@ export function Billing() {
                 type="button"
                 onClick={() => pick(item)}
                 disabled={item.currentStock < 1}
-                className="flex flex-col rounded-xl border border-line bg-surface-2/80 p-3 text-left transition hover:border-brand/50 active:scale-[0.98] disabled:opacity-40"
+                className="flex flex-col rounded-xl border border-line bg-white p-3 text-left shadow-soft transition hover:border-brand/50 active:scale-[0.98] disabled:opacity-40"
               >
                 <p className="line-clamp-2 text-sm font-bold leading-snug">{productLabel(item)}</p>
                 <p className="mt-0.5 text-[10px] text-muted">{item.category}</p>
@@ -212,7 +212,7 @@ export function Billing() {
           </div>
         </div>
 
-        <Card className="flex flex-col lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)]">
+        <Card className="flex flex-col border-brand/10 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)]">
           <div className="flex items-center gap-2 border-b border-line pb-3">
             <ReceiptText className="text-brand" size={24} />
             <div>
@@ -334,7 +334,7 @@ export function Billing() {
               </div>
             )}
 
-            <div className="rounded-xl bg-brand/10 px-3 py-2 text-sm">
+            <div className="rounded-xl border border-brand/20 bg-brand/10 px-3 py-2 text-sm">
               <div className="flex justify-between text-muted">
                 <span>Subtotal</span>
                 <span>{currency(subtotal)}</span>

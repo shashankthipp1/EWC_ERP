@@ -8,31 +8,29 @@
 :root,
 [data-theme="light"] {
   color-scheme: light;
-  --bg-base: #f4f6f9;
+  --bg-base: #f3f5f8;
   --bg-elevated: #ffffff;
   --bg-surface: #ffffff;
-  --bg-surface-2: #f8fafc;
-  --border-default: rgba(15, 23, 42, 0.1);
-  --text-primary: #0f172a;
-  --text-muted: #64748b;
-  --brand: #0d9488;
-  --brand-bright: #14b8a6;
-  --accent: #6366f1;
-  --accent-soft: rgba(99, 102, 241, 0.12);
-  --danger: #dc2626;
-  --success: #059669;
-  --warning: #d97706;
+  --bg-surface-2: #f6f8fc;
+  --border-default: rgba(15, 23, 42, 0.08);
+  --text-primary: #0b1220;
+  --text-muted: #6b7280;
+  --brand: #2563eb;
+  --brand-bright: #3b82f6;
+  --accent: #7c3aed;
+  --accent-soft: rgba(124, 58, 237, 0.12);
+  --danger: #e11d48;
+  --success: #16a34a;
+  --warning: #ea580c;
   --shadow-color: rgba(15, 23, 42, 0.12);
-  --shadow-glow: 0 0 0 1px rgba(13, 148, 136, 0.2), 0 16px 40px -12px rgba(13, 148, 136, 0.25);
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+  --shadow-glow: 0 0 0 1px rgba(37, 99, 235, 0.2), 0 16px 40px -12px rgba(37, 99, 235, 0.25);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 10px 24px -10px rgba(15, 23, 42, 0.15);
   --shadow-panel: 0 24px 48px -16px rgba(15, 23, 42, 0.15);
   --shadow-soft: 0 4px 16px rgba(15, 23, 42, 0.08);
-  --bg-mesh: radial-gradient(at 0% 0%, rgba(13, 148, 136, 0.08) 0, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.06) 0, transparent 45%),
-    linear-gradient(180deg, #f4f6f9 0%, #eef2f7 100%);
-  --sidebar-bg: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  --bg-mesh: linear-gradient(180deg, #f6f7fb 0%, #edf1f7 100%);
+  --sidebar-bg: linear-gradient(180deg, #041a49 0%, #0c2d68 100%);
   --sidebar-text: #f1f5f9;
-  --sidebar-muted: #94a3b8;
+  --sidebar-muted: #c2d0ea;
 }
 
 /* —— Dark theme (premium POS night mode) —— */
@@ -69,7 +67,7 @@ body {
   margin: 0;
   min-height: 100vh;
   font-family: "DM Sans", Inter, system-ui, sans-serif;
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.5;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
@@ -96,12 +94,12 @@ textarea {
   }
 
   .enterprise-card {
-    @apply rounded-2xl border border-line shadow-card backdrop-blur-sm;
-    background: linear-gradient(180deg, color-mix(in srgb, var(--bg-surface-2) 95%, transparent), color-mix(in srgb, var(--bg-surface) 95%, transparent));
+    @apply rounded-2xl border border-line shadow-card;
+    background: var(--bg-surface);
   }
 
   .nav-item-active {
-    @apply bg-gradient-to-r from-brand to-brand-bright font-semibold text-navy shadow-glow;
+    @apply bg-white/20 font-semibold text-white shadow-glow;
   }
 
   [data-theme="light"] .nav-item-active {
@@ -109,7 +107,7 @@ textarea {
   }
 
   .nav-item-idle {
-    @apply text-sidebar-muted transition hover:bg-white/[0.06] hover:text-sidebar-text;
+    @apply text-sidebar-muted transition hover:bg-white/[0.1] hover:text-sidebar-text;
   }
 
   .sidebar-shell {
